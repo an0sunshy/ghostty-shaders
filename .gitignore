@@ -1,0 +1,10 @@
+# Host-local runtime state is generated OUTSIDE the repo
+# (~/.config/ghostty-weather/ and ~/Library/Caches/ghostty-weather/). These
+# entries just guard against stray copies and editor noise inside the tree.
+active.conf
+
+# Diagnostic scenes used while debugging the pipeline — never tracked.
+# e.g. _test-red.glsl, _test-sky.glsl, _test-quadrant.glsl
+shaders/scenes/_test-*.glsl
+
+.DS_Store

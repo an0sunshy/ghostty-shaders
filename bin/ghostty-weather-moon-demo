@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# ghostty-weather-moon-demo — cycle clear-night through every lunar phase
+# so you can see how the terminator math + surface texture render across
+# the synodic cycle. Each phase displays for DURATION seconds.
+#
+# Usage:
+#   ghostty-weather-moon-demo            # default 5s per phase
+#   ghostty-weather-moon-demo 8          # 8s per phase
+#
+# Phases shown (8-step cycle):
+#   0.000  new moon          (only sliver lit at right edge)
+#   0.125  waxing crescent
+#   0.250  first quarter     (right half lit)
+#   0.375  waxing gibbous
+#   0.500  full moon         (entire disk lit, surface most visible)
+#   0.625  waning gibbous
+#   0.750  last quarter      (left half lit)
+#   0.875  waning crescent
+#
+# Implementation: exports GHOSTTY_WEATHER_MOON_PHASE_OVERRIDE which the
+# swap script reads instead of computing the real synodic phase. Cleans
+# up by doing a final swap to clear-night WITHOUT the override so the
+# real current phase resumes.
+
+set -euo pipefail
+
+# Resolve real dir, following symlinks (~/.local/bin install). Portable.
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+    DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [ "${SOURCE#/}" = "$SOURCE" ] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+SWAP="$SCRIPT_DIR/ghostty-weather-swap"
+DURATION="${1:-5}"
+
+if ! [[ $DURATION =~ ^[0-9]+$ ]]; then
+    echo "usage: $(basename "$0") [seconds-per-phase]" >&2
+    exit 1
+fi
+
+PHASES=(
+    "0.000  new moon"
+    "0.125  waxing crescent"
+    "0.250  first quarter"
+    "0.375  waxing gibbous"
+    "0.500  full moon"
+    "0.625  waning gibbous"
+    "0.750  last quarter"
+    "0.875  waning crescent"
+)
+
+trap 'echo; echo "demo stopped — restoring real phase..."; unset GHOSTTY_WEATHER_MOON_PHASE_OVERRIDE; "$SWAP" clear-night >/dev/null; exit 0' INT
+
+echo "moon-phase demo: cycling 8 phases, ${DURATION}s each. Ctrl-C to stop."
+for entry in "${PHASES[@]}"; do
+    phase=${entry%% *}
+    label=${entry#* }
+    label=${label##* }    # trim leading spaces
+    echo "  $(date +%T)  phase=$phase  $label"
+    GHOSTTY_WEATHER_MOON_PHASE_OVERRIDE="$phase" "$SWAP" clear-night >/dev/null
+    sleep "$DURATION"
+done
+
+# Restore real phase one last time so the user isn't left on whatever
+# the last cycle showed.
+"$SWAP" clear-night >/dev/null
+echo "done — real lunar phase restored."

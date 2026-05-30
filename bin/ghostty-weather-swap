@@ -1,0 +1,217 @@
+#!/usr/bin/env bash
+# ghostty-weather-swap — switch the active Ghostty weather shader and
+# trigger a live config reload across all open Ghostty windows.
+#
+# Architecture:
+#   - Scene shaders (source of truth, versioned) live in this repo at
+#     shaders/scenes/<scene>.glsl
+#   - On invocation we copy the chosen scene to a NEW path each time
+#     (~/Library/Caches/ghostty-weather/weather-<timestamp>.glsl) and
+#     point Ghostty's config-file include at it.
+#   - SIGUSR2 to the Ghostty process triggers reloadConfig().
+#
+# WHY filename rotation: Ghostty's renderer compares custom-shader by
+# *path string* equality (RepeatableString.equal in src/renderer/generic.zig).
+# Overwriting the same file in place is a no-op for the reload check.
+# A new path each swap forces the equality check to fire and the renderer
+# to recompile shaders for every open surface.
+#
+# Required one-time setup (handled by install.sh): the Ghostty config must
+# include the generated active.conf, e.g.:
+#   config-file = ?/Users/<you>/.config/ghostty-weather/active.conf
+# (The `?` makes Ghostty silently skip the include if the file doesn't yet
+#  exist. install.sh writes this into the always-loaded secondary config so
+#  it's independent of any dotfiles repo.)
+#
+# Usage:
+#   ghostty-weather-swap <scenario>
+# Available scenarios are whatever .glsl files exist under
+# shaders/scenes/ — currently:
+#   clear-day clear-night cloudy rain snow thunderstorm
+# (Fog conditions map to `cloudy` for now; a dedicated fog.glsl can be
+# added later if the diffuse-haze look diverges enough from cloud puffs.)
+
+set -euo pipefail
+
+# Resolve this script's real directory, following symlinks so it works when
+# invoked via a ~/.local/bin symlink. Portable: bare `readlink` only (no
+# `readlink -f`, which BSD/macOS lack).
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+    DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [ "${SOURCE#/}" = "$SOURCE" ] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCENES_DIR="$REPO_DIR/shaders/scenes"
+
+# Rotated weather-<...>.glsl files live in ~/Library/Caches (host-local
+# ephemeral state). The include file lives under ~/.config/ghostty-weather/
+# alongside the other runtime state (location.json, config.env). The Ghostty
+# config pulls it in via an absolute `config-file = ?<...>/active.conf` line
+# that install.sh adds to the always-loaded secondary config.
+ACTIVE_DIR="$HOME/Library/Caches/ghostty-weather"
+INCLUDE_DIR="$HOME/.config/ghostty-weather"
+INCLUDE_FILE="$INCLUDE_DIR/active.conf"
+
+usage() {
+    local available
+    if [[ -d $SCENES_DIR ]]; then
+        available=$(find "$SCENES_DIR" -maxdepth 1 -name '*.glsl' -exec basename {} .glsl \; | sort | tr '\n' ' ')
+    else
+        available="(scenes dir missing: $SCENES_DIR)"
+    fi
+    echo "usage: $(basename "$0") <scenario>" >&2
+    echo "  available scenarios: $available" >&2
+    exit 1
+}
+
+SCENARIO="${1:-}"
+[[ -n $SCENARIO ]] || usage
+
+SCENE_FILE="$SCENES_DIR/$SCENARIO.glsl"
+[[ -f $SCENE_FILE ]] || { echo "scene not found: $SCENE_FILE" >&2; exit 1; }
+
+mkdir -p "$ACTIVE_DIR" "$INCLUDE_DIR"
+
+# Rotated filename. Seconds since epoch is fine for our cadence (no
+# expected sub-second swaps).
+# Filename includes PID so concurrent swaps (focus daemon + weather poller
+# both firing in the same second) generate distinct paths. Without this,
+# RepeatableString.equal() in Ghostty's renderer would see the same path
+# string and skip the reload — a silent failure.
+NEW_NAME="weather-$(date +%s)-$$.glsl"
+NEW_PATH="$ACTIVE_DIR/$NEW_NAME"
+
+# Compute seconds-since-midnight for time-of-day shaders. Baked in as a
+# #define rather than passed as a uniform because Ghostty 1.3.1 doesn't
+# yet supply iDate (NOT CURRENTLY SUPPORTED per +show-config docs).
+H=$(date +%H); M=$(date +%M); S=$(date +%S)
+SECONDS_TODAY=$(( 10#$H * 3600 + 10#$M * 60 + 10#$S ))
+
+# Moon phase ∈ [0,1) — synodic period 29.530588d, reference new moon
+# 2000-01-06 18:14 UTC (unix ts 946794840). The fractional part of
+# (days since reference / 29.530588) gives the current phase. Baked in
+# because computing it inside the shader would need iDate (unsupported).
+#
+# Override: GHOSTTY_WEATHER_MOON_PHASE_OVERRIDE in the env (set by the
+# moon-phase demo script) takes precedence — useful for cycling through
+# phases manually without waiting on real synodic time.
+if [[ -n ${GHOSTTY_WEATHER_MOON_PHASE_OVERRIDE:-} ]]; then
+    MOON_PHASE=$GHOSTTY_WEATHER_MOON_PHASE_OVERRIDE
+else
+    NOW=$(date +%s)
+    MOON_PHASE=$(awk -v now="$NOW" 'BEGIN{
+        days = (now - 946794840) / 86400.0
+        p = days / 29.530588
+        print p - int(p)
+    }')
+fi
+
+# Prepend #defines then concatenate the scene. Scenes that don't reference
+# a #define have a #ifndef guard with a sane fallback — injection is safe
+# for every scene.
+{
+    printf '#define TIME_OF_DAY_BASE %d.0\n' "$SECONDS_TODAY"
+    printf '#define MOON_PHASE %s\n' "$MOON_PHASE"
+    cat "$SCENE_FILE"
+} > "$NEW_PATH"
+
+# Serialize concurrent swaps via a mkdir-based lock (atomic on POSIX,
+# doesn't depend on macOS-absent `flock`). Without this, focus-daemon +
+# cron-poller firing at the same instant could interleave writes,
+# leaving a half-formed active.conf. Polling at 100ms × 50 tries = 5s
+# max wait; the actual write is trivially fast.
+LOCKDIR="${INCLUDE_FILE}.lock.d"
+TRIES=0
+while ! mkdir "$LOCKDIR" 2>/dev/null; do
+    TRIES=$((TRIES + 1))
+    if [ $TRIES -gt 50 ]; then
+        echo "ghostty-weather-swap: failed to acquire lock at $LOCKDIR after 5s" >&2
+        exit 1
+    fi
+    sleep 0.1
+done
+
+# Snapshot the current include so we can revert if the new scene fails to
+# compile in Ghostty's renderer (caught via the post-swap log check below).
+PREV_BACKUP=""
+if [[ -f $INCLUDE_FILE ]]; then
+    PREV_BACKUP=$(mktemp -t ghostty-weather-revert.XXXXXX)
+    cp "$INCLUDE_FILE" "$PREV_BACKUP"
+fi
+# Cleanup: always release the lock; remove backup unless we already moved
+# it back (set to "" on successful revert).
+trap '
+    rmdir "$LOCKDIR" 2>/dev/null
+    [[ -n "$PREV_BACKUP" ]] && rm -f "$PREV_BACKUP"
+' EXIT
+
+# Write the include file Ghostty pulls in via `config-file =`. Absolute
+# paths so it works regardless of Ghostty's working directory.
+cat > "$INCLUDE_FILE" <<EOF
+# Generated by ghostty-weather-swap; do not edit by hand.
+# Active scenario: $SCENARIO  ($(date -u +%Y-%m-%dT%H:%M:%SZ))
+custom-shader = $NEW_PATH
+custom-shader-animation = true
+EOF
+
+# Keep the 10 most recent rotated files. The renderer may still be
+# compiling a previous shader for a window on another Space; deleting
+# its source mid-compile can crash. 10-deep covers focus-storm scenarios
+# (Cmd+Tab spree) without growing the cache unbounded.
+KEEP=10
+# shellcheck disable=SC2012  # filenames are timestamp+pid, no special chars
+ls -t "$ACTIVE_DIR"/weather-*.glsl 2>/dev/null | tail -n +$((KEEP + 1)) | while read -r old; do
+    rm -f "$old"
+done
+
+# Send SIGUSR2 — Ghostty's macOS AppDelegate installs a handler that calls
+# reloadConfig() (no Accessibility permission needed, unlike a synthesized
+# Cmd+Shift+, keystroke). Restrict the signal to ghostty processes owned
+# by the current user — on multi-user hosts an unscoped `pkill -x ghostty`
+# would try to signal someone else's process and fail (or worse, succeed
+# if root is running it).
+GHOSTTY_PIDS=$(pgrep -x -U "$(id -u)" ghostty || true)
+if [[ -z $GHOSTTY_PIDS ]]; then
+    echo "swapped: $SCENARIO -> $NEW_NAME (Ghostty not running; will load on next launch)"
+    exit 0
+fi
+SWAP_START=$(date '+%Y-%m-%d %H:%M:%S')
+kill -USR2 $GHOSTTY_PIDS
+
+# Post-swap validation: query Ghostty's unified log for compile failures
+# referencing the file we just wrote. If found, the renderer fell back to
+# no shader on all surfaces — revert active.conf to the previous content
+# and reload again so users don't end up shaderless from a typo.
+#
+# Why post-hoc instead of preflight: Ghostty's Shadertoy GLSL has implicit
+# `mainImage` + Ghostty-specific uniforms that no standalone validator
+# (naga, glslangValidator) accepts without first wrapping in Ghostty's
+# preamble. Cheapest reliable check is to let Ghostty itself try.
+sleep 0.5
+# `|| true` because grep with no matches exits 1 — with `set -o pipefail`
+# at top of file that would abort the whole script on every successful
+# swap. We only care whether the matched lines are non-empty.
+ERR=$(/usr/bin/log show \
+        --predicate '(process == "ghostty") OR (processImagePath CONTAINS "Ghostty")' \
+        --start "$SWAP_START" --info 2>/dev/null \
+    | grep -F "$NEW_NAME" \
+    | grep -iE 'spirv error|GlslangFailed|error loading' \
+    | head -3 || true)
+
+if [[ -n $ERR ]]; then
+    echo "ghostty-weather-swap: scene '$SCENARIO' failed Ghostty compile validation:" >&2
+    printf '  %s\n' "$ERR" >&2
+    if [[ -n $PREV_BACKUP && -f $PREV_BACKUP ]]; then
+        mv "$PREV_BACKUP" "$INCLUDE_FILE"
+        PREV_BACKUP=""   # don't double-delete in the trap
+        kill -USR2 $GHOSTTY_PIDS
+        echo "ghostty-weather-swap: reverted to previous active include" >&2
+    fi
+    rm -f "$NEW_PATH"
+    exit 1
+fi
+
+echo "swapped: $SCENARIO -> $NEW_NAME (Ghostty reloaded)"
