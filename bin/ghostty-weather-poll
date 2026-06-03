@@ -69,6 +69,9 @@ FALLBACK_LON="-74.0060"
 
 CACHE_MAX_STALE=$((6 * 3600))    # 6 hours
 POLL_INTERVAL=900                # 15 minutes
+# Cap the log so a 15-min cadence can't grow it without bound. Mirrors the
+# 256k self-rotation in lifesupport's scripts/sync.sh for consistency.
+LOG_MAX_BYTES="${GHOSTTY_WEATHER_LOG_MAX:-262144}"   # 256k
 
 # Marker files shared with ghostty-weather-toggle. If the user manually
 # pauses or resumes, the poller respects that and won't fight it.
@@ -79,6 +82,22 @@ MANUAL_RESUME_MARKER="$CACHE_DIR/manual-resume-override"
 # ---------------------------------------------------------------- helpers
 
 log() { printf '%s ghostty-weather-poll: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
+
+# Self-rotate the log: keep the last $LOG_MAX_BYTES bytes, in place. Truncates
+# at process EXIT (via trap) so it never races with the launchd-held stdout
+# fd — by exit time all our writes are done, and launchd reopens the path on
+# the next run. Keeping the same file (tail → tmp → mv) means we never break
+# the StandardOutPath the plist points at. No-op if the file is under the cap.
+# Portable: tail -c + wc -c only (no truncate(1), absent on stock macOS).
+truncate_log() {
+    [ -f "$LOG_FILE" ] || return 0
+    local size
+    size=$(wc -c <"$LOG_FILE" 2>/dev/null || echo 0)
+    if [ "$size" -gt "$LOG_MAX_BYTES" ]; then
+        tail -c "$LOG_MAX_BYTES" "$LOG_FILE" >"$LOG_FILE.tmp" 2>/dev/null \
+            && mv "$LOG_FILE.tmp" "$LOG_FILE"
+    fi
+}
 
 # Map WMO weather_code + is_day to one of our 6 scene names. Mirrors the
 # HTML preview's WEATHER_MAP. Unknown codes fall back to clear by time.
@@ -303,6 +322,11 @@ fi
 # ---------------------------------------------------------------- main
 
 mkdir -p "$CACHE_DIR" "$LOG_DIR"
+
+# Cap the log at exit of every poll run (not the --install/--help subcommands
+# above, which already exited). Runs on all exit paths, including the early
+# `exit 0` returns in the battery/pause branches below.
+trap truncate_log EXIT
 
 # Battery awareness: opt-in via PAUSE_ON_BATTERY=true in config.env.
 # When on battery, pause the shader entirely (matches manual --pause via
