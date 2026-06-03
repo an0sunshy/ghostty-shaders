@@ -5,6 +5,14 @@
 // Grid 22×10 with density 0.06/0.08 gives ~16 partial streaks visible at
 // any moment. Color is neutral grey (not blue), contribution kept small
 // so the effect reads as a misty wash rather than discrete drops.
+//
+// IS_DAY (baked by ghostty-weather-swap from Open-Meteo's is_day, 1.0 day /
+// 0.0 night) dims the streaks at night. Guarded so the scene compiles
+// stand-alone (day look).
+
+#ifndef IS_DAY
+#define IS_DAY 1.0
+#endif
 
 float rainHash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -63,8 +71,11 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec3 nearColor = vec3(0.42, 0.46, 0.52);   // crisper, nearer
     vec3 overcast  = vec3(-0.015, -0.013, -0.008);
 
+    // Night dimming: rain catches less light after dark. 1.0 by day,
+    // 0.55 at night.
+    float dayDim = mix(0.55, 1.0, IS_DAY);
     // Lower overall multiplier than before — streaks merge into the bg.
-    vec3 effect = (farColor * rFar + nearColor * rNear + overcast) * 0.45;
+    vec3 effect = (farColor * rFar + nearColor * rNear + overcast) * 0.45 * dayDim;
     vec3 bgFinal = iBackgroundColor + effect;
     vec3 outRgb = bgFinal * (1.0 - term.a) + term.rgb;
     fragColor = vec4(outRgb, 1.0);

@@ -109,12 +109,28 @@ else
     }')
 fi
 
+# Day/night flag, baked as #define IS_DAY (1.0 day, 0.0 night). The weather
+# scenes (cloudy/rain/snow/thunderstorm) dim their sky at night so an
+# overcast night still reads as night. clear-day/clear-night ignore it.
+#
+# Source of truth: GHOSTTY_WEATHER_IS_DAY in the env, set by
+# ghostty-weather-poll from Open-Meteo's is_day (real sunrise/sunset for the
+# location). When unset (manual `swap`), fall back to a local-clock heuristic
+# matching the poller's offline scene_by_hour (day = 06:00–17:59).
+case "${GHOSTTY_WEATHER_IS_DAY:-}" in
+    1|1.0|true|yes|TRUE|Yes) IS_DAY=1.0 ;;
+    0|0.0|false|no|FALSE|No) IS_DAY=0.0 ;;
+    "") if (( 10#$H >= 6 && 10#$H < 18 )); then IS_DAY=1.0; else IS_DAY=0.0; fi ;;
+    *)  IS_DAY=1.0 ;;   # unrecognized → safe default (day, undimmed)
+esac
+
 # Prepend #defines then concatenate the scene. Scenes that don't reference
 # a #define have a #ifndef guard with a sane fallback — injection is safe
 # for every scene.
 {
     printf '#define TIME_OF_DAY_BASE %d.0\n' "$SECONDS_TODAY"
     printf '#define MOON_PHASE %s\n' "$MOON_PHASE"
+    printf '#define IS_DAY %s\n' "$IS_DAY"
     cat "$SCENE_FILE"
 } > "$NEW_PATH"
 

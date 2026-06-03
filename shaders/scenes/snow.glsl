@@ -1,6 +1,15 @@
 // Snow — sparse slow drifting flakes in 3 parallax layers. Each flake
 // is a small soft circle that gently sways as it falls. Background-only;
 // text passes through.
+//
+// IS_DAY (baked by ghostty-weather-swap from Open-Meteo's is_day, 1.0 day /
+// 0.0 night) dims the flakes at night. Snow stays relatively visible after
+// dark (it reflects ambient light well), so the night factor is gentle.
+// Guarded so the scene compiles stand-alone (day look).
+
+#ifndef IS_DAY
+#define IS_DAY 1.0
+#endif
 
 float snowHash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -62,7 +71,10 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
     // Soft white — slight blue tint so it reads as cold/snowy.
     vec3 snowColor = vec3(0.68, 0.74, 0.82);
-    vec3 effect = snowColor * s * 0.55;
+    // Night dimming: gentle — snow reflects ambient light and stays the most
+    // visible of the precip scenes after dark. 1.0 by day, 0.65 at night.
+    float dayDim = mix(0.65, 1.0, IS_DAY);
+    vec3 effect = snowColor * s * 0.55 * dayDim;
 
     vec3 bgFinal = iBackgroundColor + effect;
     vec3 outRgb = bgFinal * (1.0 - term.a) + term.rgb;

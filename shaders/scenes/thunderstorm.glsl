@@ -4,6 +4,15 @@
 // Flashes every ~15 sec, only ~30% of slots fire, ~25% of those get a
 // secondary stutter. Flash intensity capped at 0.35 so it pulses the bg
 // without strobing the text away.
+//
+// IS_DAY (baked by ghostty-weather-swap from Open-Meteo's is_day, 1.0 day /
+// 0.0 night) dims the rain + overcast base at night. Lightning is left at
+// full intensity — a bright strike against a darker night sky is exactly
+// the desired drama. Guarded so the scene compiles stand-alone (day look).
+
+#ifndef IS_DAY
+#define IS_DAY 1.0
+#endif
 
 float tsHash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -87,7 +96,11 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec3 litFarColor  = farColor  + flashColor * flash * spatial * 0.3;
     vec3 litNearColor = nearColor + flashColor * flash * spatial * 0.3;
 
-    vec3 effect = (litFarColor * rFar + litNearColor * rNear + overcast) * 0.5
+    // Night dimming applies to the rain + overcast base only; the lightning
+    // term is added at full strength so strikes pop against the darker sky.
+    // 1.0 by day, 0.5 at night.
+    float dayDim = mix(0.5, 1.0, IS_DAY);
+    vec3 effect = (litFarColor * rFar + litNearColor * rNear + overcast) * 0.5 * dayDim
                 + flashColor * flash * spatial * 0.45;
     vec3 bgFinal = iBackgroundColor + effect;
     vec3 outRgb = bgFinal * (1.0 - term.a) + term.rgb;

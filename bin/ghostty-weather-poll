@@ -380,4 +380,5 @@ fi
 
 SCENE=$(pick_scene "$CODE" "$IS_DAY")
 log "weather_code=$CODE is_day=$IS_DAY temp=${TEMP}°C → $SCENE"
-"$SWAP" "$SCENE"
+# Pass the API's real is_day to swap so weather scenes dim at night.
+GHOSTTY_WEATHER_IS_DAY="$IS_DAY" "$SWAP" "$SCENE"
