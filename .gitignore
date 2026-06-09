@@ -9,5 +9,10 @@ shaders/scenes/_test-*.glsl
 
 .DS_Store
 
-# Compiled benchmark binary — rebuilt on demand by bench/run-bench.sh.
+# Compiled benchmark binaries — rebuilt on demand by bench/*.sh.
 bench/glsl_bench
+bench/glsl_image
+
+# Vendored stb single-header libs — fetched on demand by bench/golden.sh.
+# (bench/golden/*.png and bench/baseline.json ARE tracked.)
+bench/vendor/

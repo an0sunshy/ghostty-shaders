@@ -1,0 +1,9 @@
+[
+  {"scene": "baseline", "median_ms": 0.04654, "min_ms": 0.04510, "pct_budget": 0.56, "ratio_to_baseline": 1.00},
+  {"scene": "clear-day", "median_ms": 0.16987, "min_ms": 0.15731, "pct_budget": 2.04, "ratio_to_baseline": 3.65},
+  {"scene": "clear-night", "median_ms": 0.28328, "min_ms": 0.23583, "pct_budget": 3.40, "ratio_to_baseline": 6.09},
+  {"scene": "cloudy", "median_ms": 0.35745, "min_ms": 0.30269, "pct_budget": 4.29, "ratio_to_baseline": 7.68},
+  {"scene": "rain", "median_ms": 0.19758, "min_ms": 0.18270, "pct_budget": 2.37, "ratio_to_baseline": 4.25},
+  {"scene": "snow", "median_ms": 0.25014, "min_ms": 0.23067, "pct_budget": 3.00, "ratio_to_baseline": 5.37},
+  {"scene": "thunderstorm", "median_ms": 0.24802, "min_ms": 0.23394, "pct_budget": 2.98, "ratio_to_baseline": 5.33}
+]
