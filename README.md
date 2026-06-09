@@ -1,5 +1,9 @@
 # ghostty-weather
 
+<!-- Replace OWNER with the GitHub org/user once published -->
+![CI](https://github.com/OWNER/ghostty-weather/actions/workflows/ci.yml/badge.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+
 Live, weather-driven background shaders for the [Ghostty](https://ghostty.org)
 terminal. A small daemon polls your local weather every 15 minutes and swaps
 Ghostty's `custom-shader` to match — clear day, clear night (with a
@@ -9,11 +13,25 @@ open window in place, no restart.
 Text stays fully legible: every scene renders **behind** the terminal contents
 and lets the glyph layer pass through untouched.
 
+## Screenshots
+
+The project is visual — these are what sell it. Real captures live under
+`assets/`; the references below are placeholders until contributors add them
+(see [Contributing & quality](#contributing--quality)).
+
+![clear-day](assets/clear-day.png)
+![clear-night](assets/clear-night.png)
+![rain](assets/rain.png)
+![snow](assets/snow.png)
+
+> Contributors: please add real captures (PNG, ideally a short GIF of a swap)
+> under `assets/` and update these references.
+
 ---
 
 ## How it works
 
-```
+```text
  ┌─ ghostty-weather-poll ─┐      ┌─ ghostty-weather-swap ─┐      ┌─ Ghostty ─┐
  │ Open-Meteo current     │      │ pick scene .glsl       │      │ reload    │
  │ weather + is_day  ─────┼─────▶│ bake moon-phase/time   │─────▶│ config    │
@@ -199,9 +217,29 @@ Runtime state under `~/.config/ghostty-weather/` and
 `~/Library/Caches/ghostty-weather/` is left intact; delete it manually if you
 want a clean slate.
 
+## Contributing & quality
+
+Contributions are welcome — new scenes especially. Start with
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for dev setup and the
+[`docs/scene-authoring.md`](docs/scene-authoring.md) guide for the uniform list,
+baked `#define`s, and the legibility-and-performance conventions every scene
+must follow. Two gates are non-negotiable: the **compute gate**
+(`bench/run-bench.sh`, every scene under 5% of the frame budget) and the
+**golden-image** check. Beyond CI, the repo keeps a panel of review personas —
+reproducible Claude Code reviewers that judge what CI can't.
+
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, adding a scene, commit style
+- [`docs/scene-authoring.md`](docs/scene-authoring.md) — shader conventions
+- [`bench/run-bench.sh`](bench/run-bench.sh) — the compute gate (see [Performance](#performance))
+- [`docs/review-personas.md`](docs/review-personas.md) — the review panel
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
 ## Layout
 
-```
+```text
 bin/
   ghostty-weather-swap        apply a scene + reload Ghostty
   ghostty-weather-poll        fetch weather, pick scene, swap; LaunchAgent installer
@@ -211,6 +249,25 @@ bin/
 shaders/scenes/               the six scene shaders (.glsl)
 bench/
   glsl_bench.c                headless GPU timing harness (CGL/OpenGL)
+  glsl_image.c                deterministic per-scene PNG renderer (golden)
   run-bench.sh                build + benchmark all scenes, gate on % budget
+  wrap-shader.sh              wrap a scene into a stand-alone frag for validation
+  golden.sh                   render + diff scenes against committed references
+  golden/                     committed golden reference images (one per scene)
+  baseline.json               recorded per-scene benchmark numbers
+docs/
+  scene-authoring.md          shader conventions, uniforms, baked defines
+  review-personas.md          the review panel (Claude Code subagents)
+.claude/agents/               the 6 review personas (oss-maintainer, end-user-
+                              advocate, security-reviewer, perf-gpu-engineer,
+                              accessibility-legibility, visual-regression-qa)
+.github/                      CI workflow + issue/PR templates
+assets/                       screenshots / GIFs for the README (add captures)
 install.sh                    installer / uninstaller
+LICENSE                       MIT
+CONTRIBUTING.md               dev setup + how to add a scene
+CODE_OF_CONDUCT.md            contributor conduct
+SECURITY.md                   threat model + how to report a vulnerability
+CHANGELOG.md                  Keep a Changelog / semver history
+.editorconfig                 shared editor settings
 ```
