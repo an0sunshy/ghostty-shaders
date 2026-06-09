@@ -1,0 +1,84 @@
+name: Bug report
+description: Something in ghostty-weather is broken or behaving unexpectedly.
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please fill in as much as you can — the poll
+        log and your Ghostty version are the most useful starting points.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the actual behavior.
+      placeholder: After the weather changed to rain, the shader went black.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      placeholder: The rain scene should appear behind the terminal text.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scene
+    attributes:
+      label: Scene affected
+      description: Which scene exhibits the problem?
+      options:
+        - clear-day
+        - clear-night
+        - cloudy
+        - rain
+        - snow
+        - thunderstorm
+        - all
+        - "n/a"
+    validations:
+      required: true
+
+  - type: input
+    id: ghostty-version
+    attributes:
+      label: Ghostty version
+      description: Output of `ghostty --version` (or the version shown in the app).
+      placeholder: "1.3.1"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS and version
+      description: macOS or Linux, plus the version / distro.
+      placeholder: "macOS 14.5 (Apple Silicon) / Ubuntu 24.04 + Ghostty Linux"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: >
+        The poll log lives at `~/Library/Logs/ghostty-weather-poll.log` on
+        macOS. Paste any relevant lines (compile errors, revert messages, etc.).
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this? Include the exact commands you ran.
+      placeholder: |
+        1. ghostty-weather-swap rain
+        2. Observe ...
+    validations:
+      required: true

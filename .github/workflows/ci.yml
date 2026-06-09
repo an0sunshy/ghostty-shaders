@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Cancel superseded runs for the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint (shell + GLSL + markdown)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck and glslang-tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck glslang-tools
+
+      - name: Shellcheck all bash scripts
+        run: |
+          set -euo pipefail
+          # Collect scripts from each location that exists; tolerate absent dirs.
+          files=()
+          for pattern in bin/* install.sh bench/*.sh scripts/*; do
+            for f in $pattern; do
+              [ -f "$f" ] || continue
+              case "$f" in
+                *.c|*.glsl|*.md) continue ;;
+              esac
+              # Only lint files that are shell scripts (shebang or .sh suffix).
+              if [ "${f##*.}" = "sh" ] || head -n1 "$f" | grep -qE '^#!.*\b(bash|sh)\b'; then
+                files+=("$f")
+              fi
+            done
+          done
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No shell scripts found to lint." >&2
+            exit 0
+          fi
+          printf 'Linting:\n'
+          printf '  %s\n' "${files[@]}"
+          shellcheck "${files[@]}"
+
+      - name: Validate GLSL scenes with glslangValidator
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          scenes=(shaders/scenes/*.glsl)
+          if [ "${#scenes[@]}" -eq 0 ]; then
+            echo "No scenes found under shaders/scenes/." >&2
+            exit 1
+          fi
+          rc=0
+          for f in "${scenes[@]}"; do
+            frag="/tmp/$(basename "$f").frag"
+            echo "== wrapping $f -> $frag"
+            bench/wrap-shader.sh "$f" > "$frag"
+            if ! glslangValidator "$frag"; then
+              echo "::error file=$f::glslangValidator failed for $f"
+              rc=1
+            fi
+          done
+          exit "$rc"
+
+      - name: Markdown lint
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        with:
+          globs: "**/*.md"
+
+  compute-gate:
+    name: Compute gate (macOS GPU benchmark)
+    runs-on: macos-14
+    env:
+      GHOSTTY_WEATHER_BENCH_JSON: bench-results.json
+      GHOSTTY_WEATHER_BENCH_FRAMES: "200"
+      GHOSTTY_WEATHER_BENCH_TRIALS: "5"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run compute benchmark gate (<5% of frame budget)
+        run: bench/run-bench.sh
+
+      - name: Golden image check
+        run: bench/golden.sh check
+
+      - name: Append results to job summary
+        if: always()
+        run: |
+          {
+            echo "## ghostty-weather compute gate"
+            echo
+            if [ -f bench-results.json ]; then
+              echo '```json'
+              cat bench-results.json
+              echo '```'
+            else
+              echo "_No bench-results.json was produced._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: |
+            bench-results.json
+            bench/golden/**
+          if-no-files-found: ignore

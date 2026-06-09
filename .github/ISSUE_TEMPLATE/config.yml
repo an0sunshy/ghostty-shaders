@@ -1,0 +1,6 @@
+blank_issues_enabled: false
+contact_links:
+  # NOTE: replace OWNER with the actual GitHub org/user once the repo is hosted.
+  - name: Questions & discussion
+    url: https://github.com/OWNER/ghostty-weather/discussions
+    about: Ask questions, share setups, or discuss ideas before filing an issue.

@@ -195,6 +195,7 @@ if [[ -z $GHOSTTY_PIDS ]]; then
     exit 0
 fi
 SWAP_START=$(date '+%Y-%m-%d %H:%M:%S')
+# shellcheck disable=SC2086  # $GHOSTTY_PIDS is a space/newline-separated PID list; word-splitting is intended
 kill -USR2 $GHOSTTY_PIDS
 
 # Post-swap validation: query Ghostty's unified log for compile failures
@@ -223,6 +224,7 @@ if [[ -n $ERR ]]; then
     if [[ -n $PREV_BACKUP && -f $PREV_BACKUP ]]; then
         mv "$PREV_BACKUP" "$INCLUDE_FILE"
         PREV_BACKUP=""   # don't double-delete in the trap
+        # shellcheck disable=SC2086  # multi-PID list; word-splitting is intended
         kill -USR2 $GHOSTTY_PIDS
         echo "ghostty-weather-swap: reverted to previous active include" >&2
     fi

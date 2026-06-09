@@ -1,0 +1,60 @@
+name: New scene proposal
+description: Propose or contribute a new weather scene shader.
+title: "[scene]: "
+labels: ["new-scene"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        New scenes are gated on the same budget as the existing six: each must
+        stay under 5% of the frame budget (`bench/run-bench.sh`) and pass the
+        golden-image check (`bench/golden.sh`). Please confirm both below.
+
+  - type: input
+    id: wmo
+    attributes:
+      label: WMO weather condition
+      description: >
+        Which Open-Meteo WMO weather code(s) should map to this scene?
+        See https://open-meteo.com/en/docs for the code list.
+      placeholder: "e.g. 56, 57 (freezing drizzle)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: visual
+    attributes:
+      label: Visual description
+      description: What does the scene look like? Colors, motion, key elements.
+    validations:
+      required: true
+
+  - type: textarea
+    id: day-night
+    attributes:
+      label: Day / night behavior
+      description: >
+        Does it differ between day and night? How does it use the baked
+        time-of-day (and moon phase, if relevant) `#define`s?
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: gates
+    attributes:
+      label: Performance + golden gates
+      description: Confirm you ran the gates locally on macOS.
+      options:
+        - label: "`bench/run-bench.sh` passes — this scene is under 5% of the frame budget"
+          required: true
+        - label: "`bench/golden.sh check` passes (or I committed new golden references)"
+          required: true
+
+  - type: input
+    id: media
+    attributes:
+      label: Screenshot / GIF
+      description: Link to a screenshot or GIF showing the scene in a terminal.
+      placeholder: "https://..."
+    validations:
+      required: true

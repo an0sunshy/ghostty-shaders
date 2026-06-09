@@ -42,6 +42,7 @@ is_paused() { [[ -f $PAUSE_MARKER ]]; }
 ghostty_signal() {
     local pids
     pids=$(pgrep -x -U "$(id -u)" ghostty || true)
+    # shellcheck disable=SC2086  # $pids is a multi-PID list; word-splitting is intended
     [[ -n $pids ]] && kill -USR2 $pids
 }
 

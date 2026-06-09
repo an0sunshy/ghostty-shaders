@@ -70,7 +70,8 @@ cmd_install() {
 cmd_uninstall() {
     echo "→ removing command symlinks from $BIN_DST"
     for f in "$BIN_SRC"/ghostty-weather-*; do
-        local link="$BIN_DST/$(basename "$f")"
+        local link
+        link="$BIN_DST/$(basename "$f")"
         if [ -L "$link" ]; then rm -f "$link"; echo "    removed $(basename "$f")"; fi
     done
 
