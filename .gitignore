@@ -8,3 +8,6 @@ active.conf
 shaders/scenes/_test-*.glsl
 
 .DS_Store
+
+# Compiled benchmark binary — rebuilt on demand by bench/run-bench.sh.
+bench/glsl_bench

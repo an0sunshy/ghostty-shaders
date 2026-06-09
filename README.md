@@ -133,6 +133,35 @@ quarter, `0.5` full, `0.75` last quarter). Preview the whole cycle with
   `~/.local/bin` symlinks with portable `readlink`), so the bundled scenes are
   found no matter how the command was invoked.
 
+## Performance
+
+These shaders run as a full-screen fragment pass every frame the terminal is
+visible, so their cost is `pixels × refresh × per-pixel work`. The benchmark in
+`bench/` measures each scene's GPU time and reports it as a percentage of the
+display's per-frame budget (8.33 ms at 120 Hz), gating at a configurable
+threshold (default **5%**).
+
+```sh
+bench/run-bench.sh            # build + benchmark all scenes at 3456×2234
+```
+
+`bench/glsl_bench.c` is a self-contained headless harness: it creates an
+off-screen OpenGL 4.1 context via CGL (no window, no dependencies beyond macOS
+system frameworks), wraps each scene in the same four uniforms Ghostty supplies
+(`iResolution`, `iTime`, `iChannel0`, `iBackgroundColor`), and times steady-state
+ms/frame over many trials. Additive blending across frames defeats the tile-GPU
+dead-frame elimination that would otherwise collapse the timing to zero.
+
+**Caveat:** macOS OpenGL is itself layered over Metal, so the absolute ms is a
+proxy for Ghostty's native-Metal pipeline. Relative ranking between scenes and
+the order-of-magnitude budget % are sound — which is what the gate needs.
+
+Tunables are environment variables (`GHOSTTY_WEATHER_BENCH_W/_H`,
+`GHOSTTY_WEATHER_REFRESH_HZ`, `GHOSTTY_WEATHER_BUDGET_PCT`); see the script
+header. The dominant cost driver is procedural noise (fbm) evaluated per pixel —
+the cheapest scenes touch the screen once, the expensive ones sample multi-octave
+noise everywhere.
+
 ## Cross-platform
 
 The pipeline is macOS-first. The poller (`launchd`), battery awareness
@@ -162,5 +191,8 @@ bin/
   ghostty-weather-demo        cycle all scenes
   ghostty-weather-moon-demo   cycle lunar phases
 shaders/scenes/               the six scene shaders (.glsl)
+bench/
+  glsl_bench.c                headless GPU timing harness (CGL/OpenGL)
+  run-bench.sh                build + benchmark all scenes, gate on % budget
 install.sh                    installer / uninstaller
 ```
