@@ -15,16 +15,17 @@ float snowHash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
-// Snowflake shape — a soft fuzzy dot with a subtle hint of 6-fold
-// symmetry. `sizeJitter` scales the flake (0.7–1.3) per call so individual
-// flakes vary in apparent distance.
+// Snowflake shape — a soft fuzzy dot. `sizeJitter` scales the flake
+// (0.7–1.3) per call so individual flakes vary in apparent distance.
+//
+// PERF: the previous version added a 6-fold-symmetry spike via atan()+cos()
+// per flake. atan is one of the costlier GPU intrinsics, and the spikes are
+// imperceptible at this on-screen flake size — dropped for a plain radial
+// dot, which reads identically.
 float snowflake(vec2 lp, float sizeJitter) {
     float r = length(lp);
-    float angle = atan(lp.y, lp.x);
-    float spikes = 1.0 + 0.12 * cos(6.0 * angle);
-    float radius = r / spikes;
-    float core = smoothstep(0.04 * sizeJitter, 0.01 * sizeJitter, radius);
-    float halo = smoothstep(0.08 * sizeJitter, 0.04 * sizeJitter, radius) * 0.22;
+    float core = smoothstep(0.04 * sizeJitter, 0.01 * sizeJitter, r);
+    float halo = smoothstep(0.08 * sizeJitter, 0.04 * sizeJitter, r) * 0.22;
     return core + halo;
 }
 
@@ -34,20 +35,23 @@ float snowLayer(vec2 uv, float speed, float density, float scale, float seed) {
     // for the full sign derivation.
     q.y += mod(iTime, 100.0) * speed;
 
-    // We need the cell hash BEFORE adding sway so the sway phase can be
-    // per-flake (decorrelated). Previously every flake in a layer swayed
-    // in phase, producing visible diagonal waves.
+    // PERF: hash the cell ONCE and early-out on density before doing any of
+    // the per-flake work. The previous version hashed twice (once for the
+    // sway phase, again after re-quantizing the swayed position) and ran the
+    // sway sin() for every pixel — ~3 transcendentals per layer per pixel,
+    // ×3 layers, all before the ~95% of cells that hold no flake bailed out.
+    // Hashing once and gating first moves the sway sin behind the early-out,
+    // so empty cells cost a single hash.
     vec2 cell = floor(q);
     float h = snowHash(cell);
-    float swayPhase = h * 6.28318;
-    q.x += sin(q.y * 0.4 + swayPhase) * 0.25;
-
-    // Recompute cell coordinates after sway — minimal impact since sway
-    // is small.
-    cell = floor(q);
-    vec2 f = fract(q);
-    h = snowHash(cell);
     if (h < 1.0 - density) return 0.0;
+
+    // Per-flake sway applied to the in-cell coordinate (not by re-quantizing
+    // the cell). swayPhase from the cell hash keeps each flake decorrelated,
+    // avoiding the in-phase diagonal waves the naive version produced.
+    vec2 f = fract(q);
+    float swayPhase = h * 6.28318;
+    f.x += sin(q.y * 0.4 + swayPhase) * 0.25;
 
     // Per-flake size jitter (0.7–1.3) so flakes appear at varying apparent
     // distances. No rotation; real flakes at this distance don't visibly

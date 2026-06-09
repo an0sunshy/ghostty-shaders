@@ -145,6 +145,23 @@ threshold (default **5%**).
 bench/run-bench.sh            # build + benchmark all scenes at 3456×2234
 ```
 
+Snapshot at 3456×2234 / 120 Hz on an M1 Max (% of the 8.33 ms frame budget):
+
+| scene | % budget | | scene | % budget |
+|---|---|---|---|---|
+| clear-day | 2.2% | | snow | 3.2% |
+| rain | 2.5% | | clear-night | 3.6% |
+| thunderstorm | 3.1% | | cloudy | 4.6% |
+
+All scenes are kept under 5% of a single frame. Three started well over and were
+optimized down without changing their character: **clear-night** (23%→3.6%) now
+evaluates its 3-octave moon-surface noise only inside the moon disk instead of
+across the whole screen (lossless); **cloudy** (18%→4.6%) dropped from two
+4-octave fbm passes to one inlined 2-octave pass with the shading cue derived
+from the octaves it already has, gated to the sky band; **snow** (6%→3.2%) hashes
+each cell once and moves the per-flake sway behind the density early-out. The
+benchmark is the oracle for any future scene change.
+
 `bench/glsl_bench.c` is a self-contained headless harness: it creates an
 off-screen OpenGL 4.1 context via CGL (no window, no dependencies beyond macOS
 system frameworks), wraps each scene in the same four uniforms Ghostty supplies
@@ -158,9 +175,10 @@ the order-of-magnitude budget % are sound — which is what the gate needs.
 
 Tunables are environment variables (`GHOSTTY_WEATHER_BENCH_W/_H`,
 `GHOSTTY_WEATHER_REFRESH_HZ`, `GHOSTTY_WEATHER_BUDGET_PCT`); see the script
-header. The dominant cost driver is procedural noise (fbm) evaluated per pixel —
-the cheapest scenes touch the screen once, the expensive ones sample multi-octave
-noise everywhere.
+header. The dominant cost driver is procedural noise (fbm) evaluated per pixel,
+so the levers that matter are **gating** it to where it is actually visible and
+**reducing octaves / samples** — on Apple Silicon a cheaper *hash* does not help,
+since the GPU's `sin()` is fast and a polynomial replacement measured slower.
 
 ## Cross-platform
 

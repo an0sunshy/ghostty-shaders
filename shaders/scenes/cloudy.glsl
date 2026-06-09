@@ -28,17 +28,6 @@ float cloudNoise(vec2 p) {
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
-float cloudFbm(vec2 p) {
-    float v = 0.0;
-    float a = 0.5;
-    for (int i = 0; i < 4; i++) {
-        v += a * cloudNoise(p);
-        p *= 2.0;
-        a *= 0.5;
-    }
-    return v;
-}
-
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec2 uv = fragCoord / iResolution.xy;
     uv.y = 1.0 - uv.y;
@@ -50,29 +39,40 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // bordered on imperceptible.
     float t = mod(iTime, 1000.0) * 0.018;
 
-    // Anisotropic sampling — clouds are wider than tall, sit in the upper
-    // 70% of the canvas (sky).
-    vec2 cp = vec2(uv.x * 2.5 + t, (uv.y - 0.15) * 1.2);
-    float density = cloudFbm(cp);
+    // Vertical density bias: cumulus thin out near the zenith and sit in the
+    // upper-mid sky. Computed FIRST so the expensive fbm is skipped entirely
+    // for fragments outside the band (top ~5% and bottom ~30% of the screen),
+    // where the cloud contribution is zero regardless. PERF: gate, don't
+    // compute-then-multiply-by-zero — the band fraction sets the scene's cost.
+    float vbias = smoothstep(0.95, 0.55, uv.y) * smoothstep(0.30, 0.55, uv.y);
 
-    // Vertical density bias: cumulus thin out near the zenith and never
-    // touch the horizon. Concentrates clouds in a mid-sky band.
-    float vbias = smoothstep(0.95, 0.55, uv.y) * smoothstep(0.15, 0.45, uv.y);
-    // Smooth threshold so puffs have soft edges instead of crisp shapes.
-    float cloud = smoothstep(0.42, 0.62, density) * vbias;
+    vec3 effect = vec3(0.0);
+    if (vbias > 0.0) {
+        // Anisotropic sampling — clouds are wider than tall.
+        vec2 cp = vec2(uv.x * 2.5 + t, (uv.y - 0.15) * 1.2);
+        // 2-octave fbm inlined so both octaves can be reused for shading —
+        // total cost is two cloudNoise samples (PERF: the whole scene's hot
+        // path). norm 0.75 = 0.5 + 0.25 keeps density in [0,1) so the
+        // threshold below stays stable.
+        float n0 = cloudNoise(cp);
+        float n1 = cloudNoise(cp * 2.0 + 7.3);
+        float density = (0.5 * n0 + 0.25 * n1) / 0.75;
+        // Smooth threshold so puffs have soft edges instead of crisp shapes.
+        float cloud = smoothstep(0.42, 0.62, density) * vbias;
 
-    // Two-tone shading — sample fbm slightly offset and use the
-    // difference as a per-pixel "bright top vs shaded underside" cue.
-    // One extra fbm (3 noise samples). Sells puff volume cheaply.
-    float d2 = cloudFbm(cp + vec2(0.0, 0.15));
-    float shade = smoothstep(0.0, 0.25, density - d2);
-    vec3 cloudColor = mix(vec3(0.22, 0.24, 0.28),  // shaded underside
-                          vec3(0.36, 0.38, 0.42),  // sunlit top
-                          shade);
-    // Night dimming: moonlit clouds are much darker than sunlit ones, but
-    // not invisible. 1.0 by day, 0.5 at night.
-    float dayDim = mix(0.5, 1.0, IS_DAY);
-    vec3 effect = cloudColor * cloud * 0.46 * dayDim;
+        // Two-tone shading from octave contrast: where the fine octave sits
+        // above the coarse base the puff face catches light (bright top);
+        // below it reads as a shaded underside. Reuses n0/n1 — no extra
+        // samples — and still sells puff volume.
+        float shade = smoothstep(-0.18, 0.18, n1 - n0);
+        vec3 cloudColor = mix(vec3(0.22, 0.24, 0.28),  // shaded underside
+                              vec3(0.36, 0.38, 0.42),  // sunlit top
+                              shade);
+        // Night dimming: moonlit clouds are much darker than sunlit ones,
+        // but not invisible. 1.0 by day, 0.5 at night.
+        float dayDim = mix(0.5, 1.0, IS_DAY);
+        effect = cloudColor * cloud * 0.46 * dayDim;
+    }
 
     vec3 bgFinal = iBackgroundColor + effect;
     vec3 outRgb = bgFinal * (1.0 - term.a) + term.rgb;

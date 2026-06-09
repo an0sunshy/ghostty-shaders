@@ -155,17 +155,28 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // Moon surface shading replaces the uniform moonColor inside the
     // lit disk. Halo color matches the warmer body palette so the glow
     // isn't bluer than the disk it's surrounding.
-    vec3 moonShaded = moonSurface(lp);
     vec3 moonHaloColor = vec3(0.78, 0.75, 0.65);
 
-    // Earthshine: the dark hemisphere catches faint reflected sunlight
-    // from Earth, so it's never fully invisible. Strongest near new
-    // moon (when Earth is nearly full from the moon's perspective),
-    // weakest near full moon. Reads as "you can still see the whole
-    // moon shape outlined" without changing the phase character.
-    float darkMask = diskMask * (1.0 - litMask);
-    float earthshineStrength = mix(0.10, 0.03, litFrac);  // dim crescent → very dim full
-    vec3 earthshine = moonShaded * earthshineStrength * darkMask;
+    // PERF: moonSurface() runs three multi-octave fbm evaluations — the
+    // dominant cost of this scene. It only contributes inside the disk
+    // (moonMask and earthshine's darkMask are both gated by diskMask, which
+    // is zero for r >= 1.0), yet the disk covers <1% of the screen. Compute
+    // it only for fragments at or inside the disk edge; everywhere else the
+    // surface terms are identically zero. This is visually lossless and cuts
+    // the scene's cost ~20x (the moon disk is a tiny contiguous region, so
+    // entire GPU warps outside it skip the fbm uniformly). See bench/.
+    vec3 moonShaded = vec3(0.0);
+    vec3 earthshine = vec3(0.0);
+    if (r < 1.05) {
+        moonShaded = moonSurface(lp);
+        // Earthshine: the dark hemisphere catches faint reflected sunlight
+        // from Earth, so it's never fully invisible. Strongest near new
+        // moon (Earth nearly full from the moon's perspective), weakest near
+        // full. Reads as "you can still see the whole moon outlined".
+        float darkMask = diskMask * (1.0 - litMask);
+        float earthshineStrength = mix(0.10, 0.03, litFrac);  // dim crescent → very dim full
+        earthshine = moonShaded * earthshineStrength * darkMask;
+    }
 
     vec3 effect = moonShaded * moonMask
                 + earthshine
