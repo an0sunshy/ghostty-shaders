@@ -22,17 +22,18 @@ one under both the desktop GL and WebGL2 profiles.
 
 ## Screenshots
 
-The project is visual — these are what sell it. Real captures live under
-`assets/`; the references below are placeholders until contributors add them
-(see [Contributing & quality](#contributing--quality)).
+Captured from the [live gallery](https://OWNER.github.io/ghostty-weather/) —
+the exact scene shaders compositing behind a simulated terminal screenful,
+at deterministic timestamps (`scripts/capture-assets.sh` regenerates them).
 
-![clear-day](assets/clear-day.png)
-![clear-night](assets/clear-night.png)
-![rain](assets/rain.png)
-![snow](assets/snow.png)
+| | |
+|---|---|
+| ![clear-day — morning sun](assets/clear-day.png) | ![clear-night — full moon and stars](assets/clear-night.png) |
+| ![cloudy — drifting overcast](assets/cloudy.png) | ![rain — falling streaks](assets/rain.png) |
+| ![snow — drifting flakes](assets/snow.png) | ![thunderstorm — mid lightning flash](assets/thunderstorm.png) |
 
-> Contributors: please add real captures (PNG, ideally a short GIF of a swap)
-> under `assets/` and update these references.
+> Contributors: real terminal captures (and a short GIF of a live swap) are
+> welcome additions under `assets/`.
 
 ---
 

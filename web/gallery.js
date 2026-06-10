@@ -39,6 +39,7 @@ const state = {
   isDay: true,
   bg: [0x16 / 255, 0x18 / 255, 0x1f / 255],
   paused: false,
+  fixedTime: null,  // #t=<secs>: freeze iTime for deterministic captures
 };
 
 const $ = (id) => document.getElementById(id);
@@ -196,7 +197,8 @@ function drawFrame() {
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.useProgram(program);
   gl.uniform3f(uniforms.iResolution, canvas.width, canvas.height, 1.0);
-  gl.uniform1f(uniforms.iTime, (performance.now() - t0) / 1000);
+  gl.uniform1f(uniforms.iTime,
+    state.fixedTime ?? (performance.now() - t0) / 1000);
   gl.uniform3f(uniforms.iBackgroundColor, state.bg[0], state.bg[1], state.bg[2]);
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, termTex);
@@ -276,6 +278,14 @@ function readHash() {
   const time = parseInt(p.get('time'), 10);
   if (time >= 0 && time < 86400) state.timeOfDay = time;
   if (p.get('day') === '0') state.isDay = false;
+  // Embed mode: bare terminal window, for iframes and README captures.
+  if (p.get('embed') === '1') document.body.classList.add('embed');
+  // Fixed time: render exactly one deterministic frame at iTime=t.
+  const t = parseFloat(p.get('t'));
+  if (Number.isFinite(t) && t >= 0) {
+    state.fixedTime = t;
+    state.paused = true;
+  }
 }
 
 function onStateChange({ recompile = false, retexture = false } = {}) {
@@ -390,12 +400,15 @@ async function main() {
   needsCompile = true;
   needsTexture = true;
 
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches &&
+      state.fixedTime === null) {
     state.paused = true;
+    statusBox.textContent += ' · paused (reduced motion)';
+  }
+  if (state.paused) {
     $('ctl-pause').setAttribute('aria-pressed', 'true');
     $('ctl-pause').textContent = '▶ resume';
     renderOnce();
-    statusBox.textContent += ' · paused (reduced motion)';
   }
 
   canvas.addEventListener('webglcontextlost', (e) => {

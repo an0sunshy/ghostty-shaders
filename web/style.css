@@ -135,3 +135,16 @@ header h1 {
 
 footer { margin-top: 2rem; color: var(--dim); font-size: 0.9rem; }
 footer p { max-width: 75ch; }
+
+/* Embed mode (#embed=1): bare terminal window only — for iframes and the
+   README capture script (scripts/capture-assets.sh). */
+body.embed { max-width: none; padding: 0; }
+body.embed header,
+body.embed .scene-picker,
+body.embed .controls,
+body.embed footer { display: none; }
+body.embed .terminal-window {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
