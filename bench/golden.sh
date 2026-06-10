@@ -23,8 +23,10 @@
 #   maintainer's machine (Apple Silicon / macOS OpenGL); the tolerance is set
 #   generous-but-meaningful to absorb that minor drift while still catching real
 #   regressions (a changed effect moves the score far past it). If a *different*
-#   runner legitimately exceeds tolerance with an unchanged shader, regenerate
-#   the references on that environment with `golden.sh update` and commit them.
+#   runner (e.g. CI) legitimately exceeds tolerance with an unchanged shader,
+#   raise GHOSTTY_WEATHER_GOLDEN_TOLERANCE for that environment — the committed
+#   references are only ever regenerated on the maintainer's hardware (see
+#   docs/publishing.md), never from a CI runner's output.
 #
 # macOS only (uses CGL/OpenGL via glsl_image). On non-Darwin hosts this is a
 # clean no-op so CI lint lanes and Linux contributors do not fail.

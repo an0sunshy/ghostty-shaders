@@ -20,8 +20,13 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord)
 ```
 
 `fragCoord` is the fragment's position in pixels, with the origin at the
-bottom-left of the window (standard OpenGL convention). The shader is invoked
-once per visible pixel per frame.
+**top-left** of the window — Ghostty renders through Metal on macOS and
+hands shaders Metal's top-origin convention, not OpenGL's bottom-origin one.
+Every scene flips once (`uv.y = 1.0 - uv.y`) so "high `uv.y`" reads as "top
+of sky"; follow the same pattern. (Hosts with a bottom-origin
+`gl_FragCoord` compensate in their wrappers — see
+[shader-portability.md](shader-portability.md).) The shader is invoked once
+per visible pixel per frame.
 
 ---
 
@@ -178,7 +183,7 @@ Apply the scene to a running Ghostty instance immediately:
 ghostty-weather-swap <name>
 ```
 
-Cycle all scenes in sequence (3 seconds each by default):
+Cycle all scenes in sequence (10 seconds each by default):
 
 ```sh
 ghostty-weather-demo [seconds]
@@ -193,15 +198,38 @@ ghostty-weather-moon-demo [seconds]
 
 ---
 
-## The golden-image step
+## Both host profiles must compile
 
-Before opening a PR, run the golden-image script to record your scene's
-benchmark baseline:
+Scenes are written in the portable GLSL subset that compiles everywhere the
+project runs them: Ghostty itself, the desktop-GL bench harness, and the
+WebGL2 gallery. CI rejects a scene that breaks either wrapper; check
+locally with:
 
 ```sh
-bench/golden.sh
+bench/wrap-shader.sh                 shaders/scenes/<name>.glsl > /tmp/s.frag
+bench/wrap-shader.sh --profile es300 shaders/scenes/<name>.glsl > /tmp/s-es.frag
+glslangValidator /tmp/s.frag /tmp/s-es.frag
 ```
 
-This captures the current `bench/run-bench.sh` output and saves it as the
-reference for future comparisons. Include the benchmark table in your PR
-description as described in [CONTRIBUTING.md](../CONTRIBUTING.md).
+Practically this means: no GL-4-only built-ins, `texture()` not
+`texture2D()`, and float literals where GLSL ES requires them. The
+rationale and the evaluated alternatives live in
+[shader-portability.md](shader-portability.md).
+
+---
+
+## The golden-image step
+
+Every scene has a committed reference render under `bench/golden/`; CI
+re-renders each scene deterministically and fails on drift beyond a
+tolerance. A brand-new scene fails with `MISSING reference` until you
+record one:
+
+```sh
+bench/golden.sh update    # renders + records bench/golden/<name>.png
+bench/golden.sh check     # verify: all scenes within tolerance
+```
+
+Commit the new PNG with your scene. Separately, run `bench/run-bench.sh`
+and include its table in your PR description as described in
+[CONTRIBUTING.md](../CONTRIBUTING.md).

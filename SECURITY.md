@@ -34,13 +34,16 @@ polls reuse that cached value without further network calls.
 holds only lat/lon or a city name and optional behavior flags (e.g.
 `PAUSE_ON_BATTERY`).
 
-**File writes.** The daemon writes only to two directories owned by the
-current user:
+**File writes.** The daemon writes only to user-owned locations:
 
-- `~/Library/Caches/ghostty-weather/` — versioned shader files (the 10 most
-  recent copies of each scene, rotated automatically).
-- `~/.config/ghostty-weather/` — `config.env`, `location.json`, and a small
-  `state` file tracking the active scene and pause status.
+- `~/Library/Caches/ghostty-weather/` — rotated shader copies (the 10 most
+  recent `weather-*.glsl` files), plus marker files for pause state
+  (`paused`, `paused-by-battery`, `manual-resume-override`) and the last
+  applied scene (`last-scene`).
+- `~/.config/ghostty-weather/` — `config.env`, `location.json`, and
+  `active.conf` (the include Ghostty reads).
+- `~/Library/Logs/ghostty-weather-poll.log` — the poller's log,
+  self-rotated at 256 KiB.
 
 **Process signaling.** The swap step sends `SIGUSR2` to the Ghostty process
 owned by the same user to trigger a config reload. No privileged signal or

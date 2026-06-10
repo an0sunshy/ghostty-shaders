@@ -33,8 +33,10 @@ per-release manual step — day-to-day quality gates live in CI.
    - **Pages: Source = "GitHub Actions"** — required by
      `.github/workflows/pages.yml`; the gallery deploys on the first push
      to `main` after that.
-   - Branch protection on `main`: require the CI checks
-     (`Lint`, `Unit tests`, `Compute gate`) and pull requests before merge.
+   - Branch protection on `main`: require pull requests and the CI checks —
+     the job names as GitHub shows them are `Lint (shell + GLSL + markdown)`,
+     `Unit tests (scene mapping, moon phase, env parsing)`, and
+     `Compute gate (macOS GPU benchmark)`.
 
 5. **Watch the first CI run — calibration expected.** The compute gate and
    golden-image check have only ever run on the maintainer's M1 Max;
@@ -55,7 +57,7 @@ per-release manual step — day-to-day quality gates live in CI.
    git tag -a v0.1.0 -m "ghostty-weather v0.1.0"
    git push origin v0.1.0
    gh release create v0.1.0 --title "v0.1.0" \
-     --notes-file <(sed -n '/^## \[0.1.0\]/,/^## \[/p' CHANGELOG.md | sed '$d')
+     --notes-file <(sed -n '/^## \[0.1.0\]/,/^\[/p' CHANGELOG.md | sed '$d')
    ```
 
 ## Per release, after that

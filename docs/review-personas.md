@@ -76,10 +76,14 @@ spend their attention on the judgment calls CI cannot make.
   exceeds 5% of the frame budget. (`perf-gpu-engineer`'s hard floor.)
 - **Golden-image diff** — `bench/golden.sh check` fails on visual drift beyond
   tolerance. (`visual-regression-qa`'s hard floor.)
-- **Shellcheck** — every `bin/` script, `install.sh`, and `bench/*.sh` on Linux.
-  (`security-reviewer` / `end-user-advocate` baseline.)
+- **Shellcheck** — every shell script: `bin/`, `install.sh`, `bench/*.sh`,
+  `scripts/*`, and `tests/*`. (`security-reviewer` / `end-user-advocate`
+  baseline.)
 - **GLSL parse** — `glslangValidator` on each scene wrapped by
-  `bench/wrap-shader.sh`.
+  `bench/wrap-shader.sh` under **both** host profiles (`gl410` desktop GL
+  and `es300` WebGL2) — the gate that pins scenes to the portable subset.
+- **Unit tests** — `tests/run-tests.sh` over the decision logic (WMO
+  mapping, moon phase, env parsing) on Linux.
 - **Markdown lint** — `markdownlint-cli2` across all docs.
 
 **Needs human/agent adjudication** (what the panel is *for*):

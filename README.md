@@ -16,7 +16,7 @@ and lets the glyph layer pass through untouched.
 **[Live demo →](https://OWNER.github.io/ghostty-weather/)** — every scene
 running in your browser, with moon-phase, time-of-day, and day/night
 controls. The gallery compiles the **exact** `.glsl` files Ghostty runs,
-wrapped in a ten-line WebGL2 preamble — scenes are written in the
+wrapped in a short WebGL2 preamble — scenes are written in the
 [portable GLSL subset](docs/shader-portability.md) and CI validates every
 one under both the desktop GL and WebGL2 profiles.
 
@@ -258,11 +258,14 @@ bin/
   ghostty-weather-moon-demo   cycle lunar phases
 shaders/scenes/               the six scene shaders (.glsl)
 web/
-  index.html, gallery.js      WebGL2 scene gallery (the GitHub Pages demo)
-  glsl/preamble.glsl          ES wrapping — single source for gallery AND CI
+  index.html, gallery.js,     WebGL2 scene gallery (the GitHub Pages demo)
+  style.css
+  glsl/preamble.glsl,         ES wrapping — single source for the browser
+  glsl/epilogue.glsl          AND CI validation (wrap-shader.sh es300)
 scripts/
   build-site.sh               assemble the gallery site (Pages + local preview)
   serve-site.sh               serve the exact Pages layout locally
+  capture-assets.sh           regenerate assets/ via headless Chrome
 tests/
   run-tests.sh                unit tests for the decision logic (CI: ubuntu)
 bench/
@@ -281,8 +284,8 @@ docs/
 .claude/agents/               the 6 review personas (oss-maintainer, end-user-
                               advocate, security-reviewer, perf-gpu-engineer,
                               accessibility-legibility, visual-regression-qa)
-.github/                      CI + Pages workflows, issue/PR templates
-assets/                       screenshots / GIFs for the README (add captures)
+.github/                      CI + Pages workflows, dependabot, issue/PR templates
+assets/                       gallery scene captures (scripts/capture-assets.sh)
 install.sh                    installer / uninstaller
 LICENSE                       MIT
 CONTRIBUTING.md               dev setup + how to add a scene
@@ -290,4 +293,5 @@ CODE_OF_CONDUCT.md            contributor conduct
 SECURITY.md                   threat model + how to report a vulnerability
 CHANGELOG.md                  Keep a Changelog / semver history
 .editorconfig                 shared editor settings
+.markdownlint-cli2.jsonc      markdown lint config (CI-enforced)
 ```

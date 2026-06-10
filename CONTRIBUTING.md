@@ -16,19 +16,8 @@ Ghostty too.
 
 ## Repo layout
 
-```text
-bin/
-  ghostty-weather-swap        apply a scene + reload Ghostty
-  ghostty-weather-poll        fetch weather, pick scene, swap; LaunchAgent installer
-  ghostty-weather-toggle      pause / resume the shader
-  ghostty-weather-demo        cycle all scenes for visual review
-  ghostty-weather-moon-demo   cycle lunar phases
-shaders/scenes/               the six GLSL scene shaders
-bench/
-  glsl_bench.c                headless GPU timing harness (CGL/OpenGL)
-  run-bench.sh                build + benchmark all scenes, gate on % budget
-install.sh                    installer / uninstaller
-```
+See the [Layout section of the README](README.md#layout) — the tree is
+maintained in one place so it can't drift.
 
 ## Adding a new scene
 
@@ -60,7 +49,7 @@ install.sh                    installer / uninstaller
      defines, and performance guidance.
 
 2. **Pass the performance gate.** Every scene must stay under 5% of the
-   8.33 ms/frame budget at 3456×2234 / 120 Hz on an M1:
+   8.33 ms/frame budget at 3456×2234 / 120 Hz on an M1 Max:
 
    ```sh
    bench/run-bench.sh
@@ -89,6 +78,14 @@ install.sh                    installer / uninstaller
    ```sh
    ghostty-weather-swap <name>          # apply it immediately
    ghostty-weather-demo                 # cycle all scenes including the new one
+   ```
+
+5. **Record the golden reference.** CI fails any scene without a committed
+   reference render (`MISSING reference`):
+
+   ```sh
+   bench/golden.sh update               # writes bench/golden/<name>.png
+   git add bench/golden/<name>.png
    ```
 
 ## Running the checks

@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **WebGL2 web gallery** (`web/`), deployed to GitHub Pages: every scene
+  running live in the browser from the exact `.glsl` sources, behind a
+  simulated terminal screenful, with moon-phase / time-of-day / day-night
+  controls that re-bake the swap `#define`s and recompile. Supports
+  `#embed=1` (bare terminal window, for iframes) and `#t=<secs>`
+  (deterministic fixed-time frame) URL modes, honors
+  `prefers-reduced-motion`, and survives GPU context loss.
+- **Dual-profile shader validation in CI**: every scene must compile under
+  both the desktop GL wrapping (`bench/wrap-shader.sh`, default `gl410`)
+  and the WebGL2 wrapping (`--profile es300`, shared byte-for-byte with
+  the gallery via `web/glsl/`), pinning scenes to the portable GLSL
+  subset.
+- **README scene captures** (`assets/`), regenerated reproducibly by
+  `scripts/capture-assets.sh` through the gallery's embed + fixed-time
+  modes in headless Chrome.
+- **Shader-portability ADR** (`docs/shader-portability.md`) recording the
+  naga evaluation and the per-host-preamble decision.
+- **Maintainer runbook** (`docs/publishing.md`), Dependabot coverage for
+  GitHub Actions, and CI run deduplication (push trigger filtered to
+  `main`).
 - **Unit test suite** (`tests/run-tests.sh`) for the pure decision logic:
   the full WMO→scene mapping table, offline hour fallback, `.env` parsing,
   moon-phase math (synodic anchors, pre-epoch guard), day/night flag
