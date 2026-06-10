@@ -1,0 +1,12 @@
+# Keep GitHub Actions pinned versions current. There is no package
+# ecosystem to track — the project is dependency-free by design (bash, awk,
+# GLSL, vanilla JS) — so actions are the only supply chain to watch.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

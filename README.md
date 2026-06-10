@@ -276,6 +276,7 @@ docs/
   scene-authoring.md          shader conventions, uniforms, baked defines
   shader-portability.md       ADR: why per-host preambles, not a translator
   review-personas.md          the review panel (Claude Code subagents)
+  publishing.md               maintainer runbook: first publish + releases
 .claude/agents/               the 6 review personas (oss-maintainer, end-user-
                               advocate, security-reviewer, perf-gpu-engineer,
                               accessibility-legibility, visual-regression-qa)

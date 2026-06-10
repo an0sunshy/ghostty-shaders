@@ -1,7 +1,10 @@
 name: CI
 
+# push is filtered to main so PR branches don't run everything twice
+# (the pull_request trigger already covers them).
 on:
   push:
+    branches: [main]
   pull_request:
 
 # Cancel superseded runs for the same ref.
