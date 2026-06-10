@@ -131,7 +131,7 @@ static GLuint build_program(const char *scene_src) {
 }
 
 // Render one deterministic frame of `scene_src` at W x H into a freshly-malloc'd
-// RGBA8 buffer (top-origin rows, ready for PNG). Returns NULL on failure.
+// RGBA8 buffer (scene-upright rows, ready for PNG). Returns NULL on failure.
 static unsigned char *render_frame(const char *scene_src, int W, int H) {
     CGLPixelFormatAttribute attrs[] = {
         kCGLPFAAccelerated,
@@ -198,17 +198,16 @@ static unsigned char *render_frame(const char *scene_src, int W, int H) {
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glFinish();
 
-    // Read back. GL is bottom-origin; flip rows so the PNG is top-origin.
-    unsigned char *gl_buf = malloc((size_t)W * H * 4);
+    // Read back. glReadPixels returns rows bottom-first, but the scenes
+    // interpret fragCoord as TOP-origin (Ghostty's Metal convention) and flip
+    // uv.y internally, so the framebuffer is vertically mirrored: bottom-first
+    // readback already yields scene-upright rows, oriented exactly as Ghostty
+    // displays them. (Reversing rows here — the usual GL-to-PNG fix for
+    // bottom-origin shaders — re-inverts these scenes; it's what rendered
+    // every golden upside down.)
     unsigned char *out = malloc((size_t)W * H * 4);
-    if (!gl_buf || !out) { free(gl_buf); free(out); return NULL; }
-    glReadPixels(0, 0, W, H, GL_RGBA, GL_UNSIGNED_BYTE, gl_buf);
-    for (int y = 0; y < H; y++) {
-        memcpy(out + (size_t)(H - 1 - y) * W * 4,
-               gl_buf + (size_t)y * W * 4,
-               (size_t)W * 4);
-    }
-    free(gl_buf);
+    if (!out) return NULL;
+    glReadPixels(0, 0, W, H, GL_RGBA, GL_UNSIGNED_BYTE, out);
 
     glDeleteProgram(prog);
     CGLSetCurrentContext(NULL);

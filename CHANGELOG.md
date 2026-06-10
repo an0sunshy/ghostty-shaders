@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Golden reference images were rendered vertically flipped: `glsl_image.c`
+  applied the usual GL→PNG row reversal, but the scenes already interpret
+  `fragCoord` as top-origin (Ghostty's Metal convention), so the reversal
+  re-inverted them. Readback now emits scene-upright rows and all golden
+  references are regenerated — they now match what Ghostty actually displays
+  (moon and sun in the upper sky).
+
 ## [0.1.0] - 2026-06-08
 
 ### Added
