@@ -50,7 +50,11 @@ jobs:
           printf '  %s\n' "${files[@]}"
           shellcheck "${files[@]}"
 
-      - name: Validate GLSL scenes with glslangValidator
+      # Every scene must compile under BOTH host profiles: the desktop GL
+      # wrapping the bench harness uses (a stand-in for Ghostty's own
+      # compile) and the WebGL2 ES wrapping the web gallery compiles in the
+      # browser. This is what keeps scenes inside the portable GLSL subset.
+      - name: Validate GLSL scenes (gl410 + es300) with glslangValidator
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -61,13 +65,15 @@ jobs:
           fi
           rc=0
           for f in "${scenes[@]}"; do
-            frag="/tmp/$(basename "$f").frag"
-            echo "== wrapping $f -> $frag"
-            bench/wrap-shader.sh "$f" > "$frag"
-            if ! glslangValidator "$frag"; then
-              echo "::error file=$f::glslangValidator failed for $f"
-              rc=1
-            fi
+            for profile in gl410 es300; do
+              frag="/tmp/$(basename "$f" .glsl).$profile.frag"
+              echo "== wrapping $f ($profile) -> $frag"
+              bench/wrap-shader.sh --profile "$profile" "$f" > "$frag"
+              if ! glslangValidator "$frag"; then
+                echo "::error file=$f::glslangValidator failed for $f ($profile)"
+                rc=1
+              fi
+            done
           done
           exit "$rc"
 
