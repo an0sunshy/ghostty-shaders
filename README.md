@@ -13,6 +13,13 @@ open window in place, no restart.
 Text stays fully legible: every scene renders **behind** the terminal contents
 and lets the glyph layer pass through untouched.
 
+**[Live demo →](https://OWNER.github.io/ghostty-weather/)** — every scene
+running in your browser, with moon-phase, time-of-day, and day/night
+controls. The gallery compiles the **exact** `.glsl` files Ghostty runs,
+wrapped in a ten-line WebGL2 preamble — scenes are written in the portable
+GLSL subset and CI validates every one under both the desktop GL and WebGL2
+profiles.
+
 ## Screenshots
 
 The project is visual — these are what sell it. Real captures live under
@@ -247,6 +254,12 @@ bin/
   ghostty-weather-demo        cycle all scenes
   ghostty-weather-moon-demo   cycle lunar phases
 shaders/scenes/               the six scene shaders (.glsl)
+web/
+  index.html, gallery.js      WebGL2 scene gallery (the GitHub Pages demo)
+  glsl/preamble.glsl          ES wrapping — single source for gallery AND CI
+scripts/
+  build-site.sh               assemble the gallery site (Pages + local preview)
+  serve-site.sh               serve the exact Pages layout locally
 bench/
   glsl_bench.c                headless GPU timing harness (CGL/OpenGL)
   glsl_image.c                deterministic per-scene PNG renderer (golden)
@@ -261,7 +274,7 @@ docs/
 .claude/agents/               the 6 review personas (oss-maintainer, end-user-
                               advocate, security-reviewer, perf-gpu-engineer,
                               accessibility-legibility, visual-regression-qa)
-.github/                      CI workflow + issue/PR templates
+.github/                      CI + Pages workflows, issue/PR templates
 assets/                       screenshots / GIFs for the README (add captures)
 install.sh                    installer / uninstaller
 LICENSE                       MIT

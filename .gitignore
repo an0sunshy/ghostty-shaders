@@ -13,6 +13,9 @@ shaders/scenes/_test-*.glsl
 bench/glsl_bench
 bench/glsl_image
 
+# Assembled gallery site — rebuilt on demand by scripts/build-site.sh.
+/_site/
+
 # Vendored stb single-header libs — fetched on demand by bench/golden.sh.
 # (bench/golden/*.png and bench/baseline.json ARE tracked.)
 bench/vendor/

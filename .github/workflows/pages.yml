@@ -1,0 +1,54 @@
+name: Deploy Pages
+
+# Publishes the WebGL2 scene gallery (web/ + shaders/scenes/, assembled by
+# scripts/build-site.sh) to GitHub Pages. Requires Pages to be enabled with
+# "GitHub Actions" as the source in the repository settings.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "shaders/**"
+      - "scripts/build-site.sh"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; let in-flight production deploys finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Assemble site
+        run: scripts/build-site.sh _site
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

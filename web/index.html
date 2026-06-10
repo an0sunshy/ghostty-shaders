@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ghostty-weather — live scene gallery</title>
+  <meta name="description"
+        content="Weather-driven background shaders for the Ghostty terminal — every scene running live in WebGL2, from the exact GLSL files Ghostty compiles.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>ghostty-weather</h1>
+    <p class="tagline">
+      Weather-driven background shaders for the
+      <a href="https://ghostty.org">Ghostty</a> terminal.
+      Every scene below is the <em>exact</em> <code>.glsl</code> file Ghostty
+      compiles — fetched verbatim and wrapped in a
+      <a href="glsl/preamble.glsl">ten-line WebGL2 preamble</a>.
+    </p>
+    <nav class="links">
+      <a href="https://github.com/OWNER/ghostty-weather">GitHub</a>
+      <a href="https://github.com/OWNER/ghostty-weather#install">Install</a>
+      <a href="scenes/">Scene sources</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="scene-picker" role="group" aria-label="Scene">
+      <button data-scene="clear-day"    aria-pressed="false">☀️ clear-day</button>
+      <button data-scene="clear-night"  aria-pressed="false">🌙 clear-night</button>
+      <button data-scene="cloudy"       aria-pressed="false">☁️ cloudy</button>
+      <button data-scene="rain"         aria-pressed="false">🌧️ rain</button>
+      <button data-scene="snow"         aria-pressed="false">❄️ snow</button>
+      <button data-scene="thunderstorm" aria-pressed="false">⛈️ thunderstorm</button>
+    </div>
+
+    <div class="terminal-window">
+      <div class="titlebar">
+        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+        <span class="title">ghostty — ~/dev</span>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="gl" aria-label="Live shader preview behind simulated terminal text"></canvas>
+        <pre id="err" hidden></pre>
+        <p id="no-webgl2" hidden>
+          This browser doesn't offer WebGL2, which the gallery needs.
+          The scenes still run fine in Ghostty itself.
+        </p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <label data-for-scene="clear-night">
+        moon phase <output id="moon-out">full</output>
+        <input id="ctl-moon" type="range" min="0" max="0.99" step="0.01" value="0.5">
+      </label>
+      <label data-for-scene="clear-day">
+        time of day <output id="time-out">12:00</output>
+        <input id="ctl-time" type="range" min="0" max="86340" step="300" value="43200">
+      </label>
+      <label data-for-scene="cloudy rain snow thunderstorm" class="check">
+        <input id="ctl-day" type="checkbox" checked> daylight
+      </label>
+      <label class="color">
+        background <input id="ctl-bg" type="color" value="#16181f">
+      </label>
+      <button id="ctl-pause" aria-pressed="false">⏸ pause</button>
+      <span class="status"><span id="status">loading…</span> <span id="fps"></span></span>
+    </div>
+  </main>
+
+  <footer>
+    <p>
+      In the terminal, a 15-minute poller maps live
+      <a href="https://open-meteo.com/">Open-Meteo</a> conditions to a scene
+      and hot-reloads Ghostty in place. The sliders above re-bake the same
+      <code>#define</code>s the swap script injects (moon phase, time of day,
+      day/night) and recompile — exactly how a real swap works. Text stays
+      legible because scenes composite <em>behind</em> the glyph layer, here
+      simulated with a fake terminal screenful.
+    </p>
+    <p>
+      MIT licensed. The tab pauses itself when hidden — the same
+      don't-burn-the-battery ethos as the terminal version.
+    </p>
+  </footer>
+
+  <script src="gallery.js"></script>
+</body>
+</html>
