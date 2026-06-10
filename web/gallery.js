@@ -55,6 +55,8 @@ let termTex = null;
 let sources = null;            // { preamble, epilogue, scenes: {name: src} }
 let needsCompile = false;
 let needsTexture = false;
+let needsDraw = false;         // render one frame even while paused
+let pausedNote = '';           // e.g. ' (reduced motion)'
 let rafId = 0;
 const t0 = performance.now();  // iTime epoch: "seconds since first frame"
 let frames = 0;
@@ -128,7 +130,8 @@ function rebuildProgram() {
   };
   hideError();
   statusBox.textContent =
-    `${state.scene} · compiled in ${(performance.now() - started).toFixed(0)} ms`;
+    `${state.scene} · compiled in ${(performance.now() - started).toFixed(0)} ms` +
+    (state.paused ? ` · paused${pausedNote}` : '');
 }
 
 // --- fake terminal texture (iChannel0) ----------------------------------------
@@ -208,10 +211,16 @@ function drawFrame() {
 
 function tick() {
   rafId = requestAnimationFrame(tick);
-  if (needsTexture) { rebuildTerminalTexture(); needsTexture = false; }
-  if (needsCompile) { rebuildProgram(); needsCompile = false; }
-  if (!program || state.paused) return;
+  if (needsTexture) { rebuildTerminalTexture(); needsTexture = false; needsDraw = true; }
+  if (needsCompile) { rebuildProgram(); needsCompile = false; needsDraw = true; }
+  if (!program) return;
+  // While paused, still render exactly one frame whenever something changed
+  // (control tweak, resize, recompile, context restore) so the view never
+  // goes stale or blank.
+  if (state.paused && !needsDraw) return;
+  needsDraw = false;
   drawFrame();
+  if (state.paused) return;
   frames++;
   const now = performance.now();
   if (now - fpsStamp >= 500) {
@@ -219,13 +228,6 @@ function tick() {
     frames = 0;
     fpsStamp = now;
   }
-}
-
-// Render a single frame even while paused, so control tweaks stay visible.
-function renderOnce() {
-  if (needsTexture) { rebuildTerminalTexture(); needsTexture = false; }
-  if (needsCompile) { rebuildProgram(); needsCompile = false; }
-  if (program) drawFrame();
 }
 
 // --- errors / status -----------------------------------------------------------
@@ -267,6 +269,10 @@ function syncHash() {
     time: String(state.timeOfDay),
     day: state.isDay ? '1' : '0',
   });
+  // Keep capture/embed params so the URL stays a faithful reproduction of
+  // what's on screen.
+  if (state.fixedTime !== null) p.set('t', String(state.fixedTime));
+  if (document.body.classList.contains('embed')) p.set('embed', '1');
   history.replaceState(null, '', `#${p}`);
 }
 
@@ -291,9 +297,9 @@ function readHash() {
 function onStateChange({ recompile = false, retexture = false } = {}) {
   needsCompile = needsCompile || recompile;
   needsTexture = needsTexture || retexture;
+  needsDraw = true;
   syncControls();
   syncHash();
-  if (state.paused) renderOnce();
 }
 
 function wireUI() {
@@ -318,10 +324,17 @@ function wireUI() {
   $('ctl-bg').addEventListener('input', (e) => {
     const v = e.target.value;
     state.bg = [1, 3, 5].map((i) => parseInt(v.slice(i, i + 2), 16) / 255);
-    if (state.paused) renderOnce(); // uniform only — no recompile needed
+    needsDraw = true; // uniform only — no recompile needed
   });
   $('ctl-pause').addEventListener('click', (e) => {
     state.paused = !state.paused;
+    if (!state.paused) {
+      // Resuming exits fixed-time mode — otherwise the loop would run but
+      // redraw the same frozen iTime forever.
+      state.fixedTime = null;
+      pausedNote = '';
+      syncHash();
+    }
     e.target.setAttribute('aria-pressed', String(state.paused));
     e.target.textContent = state.paused ? '▶ resume' : '⏸ pause';
     fpsBox.textContent = '';
@@ -371,8 +384,7 @@ function setupResize() {
     if (w === canvas.width && h === canvas.height) return;
     canvas.width = w;
     canvas.height = h;
-    needsTexture = true;
-    if (state.paused) renderOnce();
+    needsTexture = true; // tick redraws even while paused (needsDraw)
   };
   new ResizeObserver(apply).observe(canvas);
   apply();
@@ -403,12 +415,11 @@ async function main() {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches &&
       state.fixedTime === null) {
     state.paused = true;
-    statusBox.textContent += ' · paused (reduced motion)';
+    pausedNote = ' (reduced motion)';
   }
   if (state.paused) {
     $('ctl-pause').setAttribute('aria-pressed', 'true');
     $('ctl-pause').textContent = '▶ resume';
-    renderOnce();
   }
 
   canvas.addEventListener('webglcontextlost', (e) => {

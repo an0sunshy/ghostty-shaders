@@ -45,7 +45,11 @@ SCENES=("$@")
 
 SITE="$(mktemp -d "${TMPDIR:-/tmp}/gw-capture.XXXXXX")"
 cleanup() {
-    [[ -n "${SERVER_PID:-}" ]] && kill "$SERVER_PID" 2>/dev/null
+    # errexit applies inside an EXIT trap: a failed kill (server already
+    # dead, e.g. port collision at startup) must not abort before the rm.
+    if [[ -n "${SERVER_PID:-}" ]]; then
+        kill "$SERVER_PID" 2>/dev/null || true
+    fi
     rm -rf "$SITE"
 }
 trap cleanup EXIT
