@@ -81,7 +81,11 @@ MANUAL_RESUME_MARKER="$CACHE_DIR/manual-resume-override"
 
 # ---------------------------------------------------------------- helpers
 
-log() { printf '%s ghostty-weather-poll: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
+# Diagnostics go to stderr: several callers are command-substituted (e.g.
+# SCENE=$(pick_scene ...)), and a stdout log line there would be captured
+# into the result. launchd merges both streams into the same log file, so
+# nothing changes for the LaunchAgent.
+log() { printf '%s ghostty-weather-poll: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
 
 # Self-rotate the log: keep the last $LOG_MAX_BYTES bytes, in place. Truncates
 # at process EXIT (via trap) so it never races with the launchd-held stdout
@@ -118,9 +122,9 @@ pick_scene() {
 }
 
 # Pick a scene from time of day alone — used when offline + no cache.
+# Hour may be passed in (tests); defaults to the local clock.
 scene_by_hour() {
-    local h
-    h=$(date +%H)
+    local h="${1:-$(date +%H)}"
     if (( 10#$h >= 6 && 10#$h < 18 )); then echo clear-day; else echo clear-night; fi
 }
 
@@ -216,6 +220,12 @@ read_location() {
     log "WARN: no location configured. Edit $ENV_FILE (LAT/LON or LOCATION) or run --set-city. Using fallback ($FALLBACK_LAT, $FALLBACK_LON)."
     LAT=$FALLBACK_LAT; LON=$FALLBACK_LON
 }
+
+# When sourced (by tests/run-tests.sh) stop here: everything above is
+# definitions without side effects; everything below acts on the system.
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+    return 0
+fi
 
 # ---------------------------------------------------------------- install
 

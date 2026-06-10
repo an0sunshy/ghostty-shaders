@@ -30,7 +30,7 @@ jobs:
           set -euo pipefail
           # Collect scripts from each location that exists; tolerate absent dirs.
           files=()
-          for pattern in bin/* install.sh bench/*.sh scripts/*; do
+          for pattern in bin/* install.sh bench/*.sh scripts/* tests/*; do
             for f in $pattern; do
               [ -f "$f" ] || continue
               case "$f" in
@@ -81,6 +81,16 @@ jobs:
         uses: DavidAnson/markdownlint-cli2-action@v16
         with:
           globs: "**/*.md"
+
+  test:
+    name: Unit tests (scene mapping, moon phase, env parsing)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run the suite
+        run: tests/run-tests.sh
 
   compute-gate:
     name: Compute gate (macOS GPU benchmark)

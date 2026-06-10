@@ -232,7 +232,9 @@ Contributions are welcome — new scenes especially. Start with
 baked `#define`s, and the legibility-and-performance conventions every scene
 must follow. Two gates are non-negotiable: the **compute gate**
 (`bench/run-bench.sh`, every scene under 5% of the frame budget) and the
-**golden-image** check. Beyond CI, the repo keeps a panel of review personas —
+**golden-image** check. The decision logic (weather→scene mapping, moon
+phase, config parsing) is unit-tested by `tests/run-tests.sh`, which runs
+in CI on Linux. Beyond CI, the repo keeps a panel of review personas —
 reproducible Claude Code reviewers that judge what CI can't.
 
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, adding a scene, commit style
@@ -260,6 +262,8 @@ web/
 scripts/
   build-site.sh               assemble the gallery site (Pages + local preview)
   serve-site.sh               serve the exact Pages layout locally
+tests/
+  run-tests.sh                unit tests for the decision logic (CI: ubuntu)
 bench/
   glsl_bench.c                headless GPU timing harness (CGL/OpenGL)
   glsl_image.c                deterministic per-scene PNG renderer (golden)

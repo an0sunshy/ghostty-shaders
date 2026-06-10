@@ -81,7 +81,8 @@ install.sh                    installer / uninstaller
    `pick_scene()` function in `bin/ghostty-weather-poll`, mapping the
    appropriate WMO weather codes to it. Keep the existing codes that already
    point to the scene you're replacing (e.g., `fog.glsl` would claim codes
-   45 and 48 currently mapped to `cloudy`).
+   45 and 48 currently mapped to `cloudy`). Extend the mapping table in
+   `tests/run-tests.sh` to pin the new codes.
 
 4. **Test manually.**
 
@@ -90,12 +91,29 @@ install.sh                    installer / uninstaller
    ghostty-weather-demo                 # cycle all scenes including the new one
    ```
 
-## Running shellcheck
+## Running the checks
 
 All `bin/` scripts and `*.sh` files must pass shellcheck with no errors:
 
 ```sh
-shellcheck bin/ghostty-weather-* bench/run-bench.sh install.sh
+shellcheck bin/ghostty-weather-* bench/*.sh scripts/*.sh tests/*.sh install.sh
+```
+
+The decision logic (WMO→scene mapping, moon phase, `.env` parsing,
+day/night normalization) is unit-tested. The suite is dependency-free
+(plain bash + awk), runs on macOS and Linux, and must pass:
+
+```sh
+tests/run-tests.sh
+```
+
+Scenes must validate under **both** host profiles — desktop GL (the bench
+harness / Ghostty stand-in) and WebGL2 (the web gallery):
+
+```sh
+bench/wrap-shader.sh                 shaders/scenes/<name>.glsl > /tmp/s.frag
+bench/wrap-shader.sh --profile es300 shaders/scenes/<name>.glsl > /tmp/s-es.frag
+glslangValidator /tmp/s.frag /tmp/s-es.frag
 ```
 
 macOS ships `bash 3.2`. Scripts must be compatible — no `${var,,}` or
@@ -131,6 +149,7 @@ Keep PRs in draft until you're ready for a full review pass.
 ## Pull requests
 
 - Run `bench/run-bench.sh` and paste the output table in the PR description.
+- Run `tests/run-tests.sh`; all assertions must pass.
 - Run `shellcheck` on any modified scripts; fix all findings.
 - PR descriptions must describe the current state of the change, not a diff
   narrative. A reader unfamiliar with the previous version should understand

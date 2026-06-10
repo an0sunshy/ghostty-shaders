@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Unit test suite** (`tests/run-tests.sh`) for the pure decision logic:
+  the full WMO→scene mapping table, offline hour fallback, `.env` parsing,
+  moon-phase math (synodic anchors, pre-epoch guard), day/night flag
+  normalization, and the seconds-since-midnight octal trap. Dependency-free
+  (bash + awk), runs on macOS and Linux, wired into CI. The scripts under
+  test gained sourced-return guards so the harness can call their functions
+  directly.
+
 ### Fixed
+
+- An unknown WMO weather code corrupted the scene name: `pick_scene()`'s
+  diagnostic log went to stdout inside a command substitution, so the
+  captured "scene" was the log line plus the scene. `log()` now writes to
+  stderr (launchd merges both streams into the same log file, so the
+  LaunchAgent's logging is unchanged).
+- `moon_phase_at` now clamps pre-reference-epoch timestamps into `[0,1)`
+  instead of returning a negative phase.
 
 - Golden reference images were rendered vertically flipped: `glsl_image.c`
   applied the usual GL→PNG row reversal, but the scenes already interpret
