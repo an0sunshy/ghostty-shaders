@@ -16,9 +16,9 @@ and lets the glyph layer pass through untouched.
 **[Live demo →](https://OWNER.github.io/ghostty-weather/)** — every scene
 running in your browser, with moon-phase, time-of-day, and day/night
 controls. The gallery compiles the **exact** `.glsl` files Ghostty runs,
-wrapped in a ten-line WebGL2 preamble — scenes are written in the portable
-GLSL subset and CI validates every one under both the desktop GL and WebGL2
-profiles.
+wrapped in a ten-line WebGL2 preamble — scenes are written in the
+[portable GLSL subset](docs/shader-portability.md) and CI validates every
+one under both the desktop GL and WebGL2 profiles.
 
 ## Screenshots
 
@@ -270,6 +270,7 @@ bench/
   baseline.json               recorded per-scene benchmark numbers
 docs/
   scene-authoring.md          shader conventions, uniforms, baked defines
+  shader-portability.md       ADR: why per-host preambles, not a translator
   review-personas.md          the review panel (Claude Code subagents)
 .claude/agents/               the 6 review personas (oss-maintainer, end-user-
                               advocate, security-reviewer, perf-gpu-engineer,
