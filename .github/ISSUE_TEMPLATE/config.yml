@@ -1,6 +1,4 @@
-blank_issues_enabled: false
-contact_links:
-
-  - name: Questions & discussion
-    url: https://github.com/an0sunshy/ghostty-weather/discussions
-    about: Ask questions, share setups, or discuss ideas before filing an issue.
+# Discussions are intentionally not enabled on this repo; questions are
+# welcome as plain (blank) issues, while bugs, feature requests, and new
+# scenes have structured templates.
+blank_issues_enabled: true

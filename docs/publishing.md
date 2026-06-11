@@ -28,8 +28,8 @@ per-release manual step — day-to-day quality gates live in CI.
 4. **Repository settings:**
    - Description + topics (`ghostty`, `glsl`, `shaders`, `terminal`,
      `weather`), social-preview image (a scene capture).
-   - **Discussions: enable** — `.github/ISSUE_TEMPLATE/config.yml` links to
-     it.
+   - Discussions stay **off** by choice; questions land as plain issues
+     (`.github/ISSUE_TEMPLATE/config.yml` has `blank_issues_enabled: true`).
    - **Pages: Source = "GitHub Actions"** — required by
      `.github/workflows/pages.yml`; the gallery deploys on the first push
      to `main` after that.

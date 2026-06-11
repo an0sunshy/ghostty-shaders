@@ -122,9 +122,10 @@ pick_scene() {
 }
 
 # Pick a scene from time of day alone — used when offline + no cache.
-# Hour may be passed in (tests); defaults to the local clock.
+# Hour is an explicit zero-padded "HH" argument: keeps the function pure
+# (directly unit-testable) and keeps shellcheck's SC2120 quiet.
 scene_by_hour() {
-    local h="${1:-$(date +%H)}"
+    local h="$1"
     if (( 10#$h >= 6 && 10#$h < 18 )); then echo clear-day; else echo clear-night; fi
 }
 
@@ -393,7 +394,7 @@ if [[ -z $RESPONSE ]]; then
         log "  using cached response (< ${CACHE_MAX_STALE}s old)"
         RESPONSE=$(cat "$CACHE_FILE")
     else
-        SCENE=$(scene_by_hour)
+        SCENE=$(scene_by_hour "$(date +%H)")
         log "  no fresh cache → fallback to '$SCENE' (by local hour)"
         "$SWAP" "$SCENE"
         exit 0
