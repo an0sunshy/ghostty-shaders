@@ -3,7 +3,7 @@
 ## Dev setup
 
 ```sh
-git clone <this-repo> ~/dev/ghostty-weather
+git clone https://github.com/an0sunshy/ghostty-weather.git ~/dev/ghostty-weather
 cd ~/dev/ghostty-weather
 ./install.sh          # symlinks commands + wires the Ghostty include
 ```
@@ -16,8 +16,56 @@ Ghostty too.
 
 ## Repo layout
 
-See the [Layout section of the README](README.md#layout) — the tree is
-maintained in one place so it can't drift.
+The README carries a [condensed top-level view](README.md#layout); the full
+file-by-file tree lives here.
+
+```text
+bin/
+  ghostty-weather-swap        apply a scene + reload Ghostty
+  ghostty-weather-poll        fetch weather, pick scene, swap; LaunchAgent installer
+  ghostty-weather-toggle      pause / resume
+  ghostty-weather-demo        cycle all scenes
+  ghostty-weather-moon-demo   cycle lunar phases
+shaders/scenes/               the six scene shaders (.glsl)
+web/
+  index.html, gallery.js,     WebGL2 scene gallery (the GitHub Pages demo)
+  style.css
+  glsl/preamble.glsl,         ES wrapping — single source for the browser
+  glsl/epilogue.glsl          AND CI validation (wrap-shader.sh es300)
+scripts/
+  build-site.sh               assemble the gallery site (Pages + local preview)
+  serve-site.sh               serve the exact Pages layout locally
+  capture-assets.sh           regenerate assets/ via headless Chrome
+tests/
+  run-tests.sh                unit tests for the decision logic (CI: ubuntu)
+bench/
+  glsl_bench.c                headless GPU timing harness (CGL/OpenGL)
+  glsl_image.c                deterministic per-scene PNG renderer (golden)
+  run-bench.sh                build + benchmark all scenes, gate on % budget
+  wrap-shader.sh              wrap a scene into a stand-alone frag for validation
+  golden.sh                   render + diff scenes against committed references
+  golden/                     committed golden reference images (one per scene)
+  baseline.json               recorded per-scene benchmark numbers
+docs/
+  scene-authoring.md          shader conventions, uniforms, baked defines
+  shader-portability.md       ADR: why per-host preambles, not a translator
+  performance.md              the compute gate, harness, and tuning
+  review-personas.md          the review panel (Claude Code subagents)
+  publishing.md               maintainer runbook: first publish + releases
+.claude/agents/               the 6 review personas (oss-maintainer, end-user-
+                              advocate, security-reviewer, perf-gpu-engineer,
+                              accessibility-legibility, visual-regression-qa)
+.github/                      CI + Pages workflows, dependabot, issue/PR templates
+assets/                       gallery scene captures (scripts/capture-assets.sh)
+install.sh                    installer / uninstaller
+LICENSE                       MIT
+CONTRIBUTING.md               dev setup + how to add a scene
+CODE_OF_CONDUCT.md            contributor conduct
+SECURITY.md                   threat model + how to report a vulnerability
+CHANGELOG.md                  Keep a Changelog / semver history
+.editorconfig                 shared editor settings
+.markdownlint-cli2.jsonc      markdown lint config (CI-enforced)
+```
 
 ## Adding a new scene
 

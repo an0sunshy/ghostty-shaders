@@ -48,18 +48,16 @@ at deterministic timestamps (`scripts/capture-assets.sh` regenerates them).
 ```
 
 1. **`ghostty-weather-poll`** fetches the current condition from Open-Meteo
-   (free, no API key) for your configured location and maps the
-   [WMO weather code](https://open-meteo.com/en/docs) + day/night flag to one
-   of six scenes.
-2. **`ghostty-weather-swap`** copies that scene to a fresh file in
-   `~/Library/Caches/ghostty-weather/`, prepends the current
-   time-of-day and moon-phase as `#define`s, points `active.conf` at it, and
-   signals Ghostty to reload.
-3. **Ghostty** reloads its config on `SIGUSR2` and recompiles the shader for
-   every open surface — the new sky appears within a frame.
+   (free, no API key) for your location and maps the
+   [WMO weather code](https://open-meteo.com/en/docs) + day/night flag to a scene.
+2. **`ghostty-weather-swap`** copies that scene to a fresh file under
+   `~/Library/Caches/ghostty-weather/`, bakes in the current time-of-day and
+   moon phase as `#define`s, and points `active.conf` at it.
+3. **Ghostty** reloads on `SIGUSR2` and recompiles the shader for every open
+   surface — the new sky appears within a frame.
 
-If the new scene fails to compile, the swap detects it in Ghostty's log and
-reverts to the previous one, so a bad edit never leaves you shaderless.
+If a scene fails to compile, the swap catches it in Ghostty's log and reverts to
+the previous one, so a bad edit never leaves you shaderless.
 
 ## Requirements
 
@@ -72,7 +70,7 @@ reverts to the previous one, so a bad edit never leaves you shaderless.
 ## Install
 
 ```sh
-git clone <this-repo> ~/dev/ghostty-weather
+git clone https://github.com/an0sunshy/ghostty-weather.git ~/dev/ghostty-weather
 cd ~/dev/ghostty-weather
 ./install.sh                 # links commands + wires the Ghostty include
 # or, in one shot, also start the auto-poller:
@@ -160,11 +158,9 @@ quarter, `0.5` full, `0.75` last quarter). Preview the whole cycle with
 
 ## Performance
 
-These shaders run as a full-screen fragment pass every frame the terminal is
-visible, so their cost is `pixels × refresh × per-pixel work`. The benchmark in
-`bench/` measures each scene's GPU time and reports it as a percentage of the
-display's per-frame budget (8.33 ms at 120 Hz), gating at a configurable
-threshold (default **5%**).
+These shaders run a full-screen fragment pass every frame the terminal is
+visible, so the gate is GPU time as a percentage of the display's per-frame
+budget (8.33 ms at 120 Hz). Every scene is kept under **5%**, and CI enforces it.
 
 ```sh
 bench/run-bench.sh            # build + benchmark all scenes at 3456×2234
@@ -178,32 +174,10 @@ Snapshot at 3456×2234 / 120 Hz on an M1 Max (% of the 8.33 ms frame budget):
 | rain | 2.5% | | clear-night | 3.6% |
 | thunderstorm | 3.1% | | cloudy | 4.6% |
 
-All scenes are kept under 5% of a single frame. Three started well over and were
-optimized down without changing their character: **clear-night** (23%→3.6%) now
-evaluates its 3-octave moon-surface noise only inside the moon disk instead of
-across the whole screen (lossless); **cloudy** (18%→4.6%) dropped from two
-4-octave fbm passes to one inlined 2-octave pass with the shading cue derived
-from the octaves it already has, gated to the sky band; **snow** (6%→3.2%) hashes
-each cell once and moves the per-flake sway behind the density early-out. The
-benchmark is the oracle for any future scene change.
-
-`bench/glsl_bench.c` is a self-contained headless harness: it creates an
-off-screen OpenGL 4.1 context via CGL (no window, no dependencies beyond macOS
-system frameworks), wraps each scene in the same four uniforms Ghostty supplies
-(`iResolution`, `iTime`, `iChannel0`, `iBackgroundColor`), and times steady-state
-ms/frame over many trials. Additive blending across frames defeats the tile-GPU
-dead-frame elimination that would otherwise collapse the timing to zero.
-
-**Caveat:** macOS OpenGL is itself layered over Metal, so the absolute ms is a
-proxy for Ghostty's native-Metal pipeline. Relative ranking between scenes and
-the order-of-magnitude budget % are sound — which is what the gate needs.
-
-Tunables are environment variables (`GHOSTTY_WEATHER_BENCH_W/_H`,
-`GHOSTTY_WEATHER_REFRESH_HZ`, `GHOSTTY_WEATHER_BUDGET_PCT`); see the script
-header. The dominant cost driver is procedural noise (fbm) evaluated per pixel,
-so the levers that matter are **gating** it to where it is actually visible and
-**reducing octaves / samples** — on Apple Silicon a cheaper *hash* does not help,
-since the GPU's `sin()` is fast and a polynomial replacement measured slower.
+Three scenes started well over budget (clear-night 23%, cloudy 18%, snow 6%) and
+were optimized down without changing their look. The headless harness, the
+OpenGL-over-Metal caveat, and how to tune a scene are documented in
+**[docs/performance.md](docs/performance.md)**.
 
 ## Cross-platform
 
@@ -239,6 +213,7 @@ reproducible Claude Code reviewers that judge what CI can't.
 
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, adding a scene, commit style
 - [`docs/scene-authoring.md`](docs/scene-authoring.md) — shader conventions
+- [`docs/performance.md`](docs/performance.md) — the compute gate, harness, and tuning
 - [`bench/run-bench.sh`](bench/run-bench.sh) — the compute gate (see [Performance](#performance))
 - [`docs/review-personas.md`](docs/review-personas.md) — the review panel
 
@@ -249,48 +224,13 @@ MIT — see [LICENSE](LICENSE).
 ## Layout
 
 ```text
-bin/
-  ghostty-weather-swap        apply a scene + reload Ghostty
-  ghostty-weather-poll        fetch weather, pick scene, swap; LaunchAgent installer
-  ghostty-weather-toggle      pause / resume
-  ghostty-weather-demo        cycle all scenes
-  ghostty-weather-moon-demo   cycle lunar phases
-shaders/scenes/               the six scene shaders (.glsl)
-web/
-  index.html, gallery.js,     WebGL2 scene gallery (the GitHub Pages demo)
-  style.css
-  glsl/preamble.glsl,         ES wrapping — single source for the browser
-  glsl/epilogue.glsl          AND CI validation (wrap-shader.sh es300)
-scripts/
-  build-site.sh               assemble the gallery site (Pages + local preview)
-  serve-site.sh               serve the exact Pages layout locally
-  capture-assets.sh           regenerate assets/ via headless Chrome
-tests/
-  run-tests.sh                unit tests for the decision logic (CI: ubuntu)
-bench/
-  glsl_bench.c                headless GPU timing harness (CGL/OpenGL)
-  glsl_image.c                deterministic per-scene PNG renderer (golden)
-  run-bench.sh                build + benchmark all scenes, gate on % budget
-  wrap-shader.sh              wrap a scene into a stand-alone frag for validation
-  golden.sh                   render + diff scenes against committed references
-  golden/                     committed golden reference images (one per scene)
-  baseline.json               recorded per-scene benchmark numbers
-docs/
-  scene-authoring.md          shader conventions, uniforms, baked defines
-  shader-portability.md       ADR: why per-host preambles, not a translator
-  review-personas.md          the review panel (Claude Code subagents)
-  publishing.md               maintainer runbook: first publish + releases
-.claude/agents/               the 6 review personas (oss-maintainer, end-user-
-                              advocate, security-reviewer, perf-gpu-engineer,
-                              accessibility-legibility, visual-regression-qa)
-.github/                      CI + Pages workflows, dependabot, issue/PR templates
-assets/                       gallery scene captures (scripts/capture-assets.sh)
-install.sh                    installer / uninstaller
-LICENSE                       MIT
-CONTRIBUTING.md               dev setup + how to add a scene
-CODE_OF_CONDUCT.md            contributor conduct
-SECURITY.md                   threat model + how to report a vulnerability
-CHANGELOG.md                  Keep a Changelog / semver history
-.editorconfig                 shared editor settings
-.markdownlint-cli2.jsonc      markdown lint config (CI-enforced)
+bin/          the five ghostty-weather-* commands (swap, poll, toggle, demos)
+shaders/      the six scene shaders (.glsl) + portable GLSL helpers
+web/          the WebGL2 scene gallery (the GitHub Pages demo)
+bench/        headless GPU timing + golden-image harness (the compute gate)
+scripts/      gallery site build / serve + asset capture
+tests/        unit tests for the decision logic (CI: ubuntu)
+docs/         scene authoring, shader portability, performance, review panel
 ```
+
+Full file-by-file tree: [CONTRIBUTING.md → Repo layout](CONTRIBUTING.md#repo-layout).
