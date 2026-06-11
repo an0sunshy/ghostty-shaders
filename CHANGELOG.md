@@ -39,6 +39,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CI now validates the defines-injected shader variant** that both real
+  hosts actually compile (`wrap-shader.sh --defines`, mirroring what
+  `ghostty-weather-swap` and the gallery bake in). Previously only the
+  `#ifndef`-fallback text was validated, so a scene defining a macro
+  without a guard would pass CI and fail live with "macro redefined".
+  Tag pushes and manual dispatch now also trigger CI, so release refs
+  always have CI evidence.
+- `scripts/capture-assets.sh` health-checks its local site server before
+  shooting (a port collision previously produced error-page screenshots
+  while reporting success), derives the default scene list from
+  `shaders/scenes/` instead of a hand-copy, and picks the thunderstorm
+  lightning frame by sweeping slots for the brightest render instead of
+  trusting a baked-in timestamp.
+- `moon_phase_at` prints fixed `%.6f` with a wrap guard — the awk default
+  format could emit the literal `1` near a synodic wrap, violating the
+  `[0,1)` contract of the baked `#define`.
+- Gallery hardening: shader recompiles from slider drags are throttled
+  (was: one compile per input event — main-thread stalls on slow GLSL
+  compilers), URL-hash writes are debounced (Safari rate-limits
+  `history.replaceState`), `devicePixelRatio` changes from monitor moves
+  re-rasterize the canvas, the terminal-text canvas is reused instead of
+  reallocated per rebuild, and the render loop parks entirely while
+  paused with nothing pending instead of spinning at vsync.
 - An unknown WMO weather code corrupted the scene name: `pick_scene()`'s
   diagnostic log went to stdout inside a command substitution, so the
   captured "scene" was the log line plus the scene. `log()` now writes to

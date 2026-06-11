@@ -77,12 +77,19 @@ usage() {
 # (0 new, 0.25 first quarter, 0.5 full, 0.75 last quarter). The negative
 # guard keeps pre-reference timestamps in range too.
 moon_phase_at() {
+    # Fixed %.6f format: awk's default %.6g would print "1" for phases that
+    # round up at 6 significant digits (breaking the [0,1) contract baked
+    # into the #define) and exponent forms like "1e-06" near new moon. The
+    # string guard maps the rounding edge 1.000000 back to 0 — physically
+    # the same instant of the cycle.
     awk -v now="$1" 'BEGIN{
         days = (now - 946794840) / 86400.0
         p = days / 29.530588
         p = p - int(p)
         if (p < 0) p += 1.0
-        print p
+        s = sprintf("%.6f", p)
+        if (s == "1.000000") s = "0.000000"
+        print s
     }'
 }
 

@@ -25,6 +25,13 @@ t() {  # t <description> <expected> <actual>
 
 t_close() {  # t_close <description> <expected> <actual> <abs-tolerance>
     local desc="$1" want="$2" got="$3" tol="$4"
+    # awk coerces a non-numeric/empty string to 0, which would make
+    # zero-expected assertions pass vacuously when the function under test
+    # produced no output at all. Require a numeric literal first.
+    if [[ ! "$got" =~ ^-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$ ]]; then
+        FAIL=$((FAIL + 1)); printf 'FAIL %s\n     want: %s ±%s\n     got:  %q (not numeric)\n' "$desc" "$want" "$tol" "$got"
+        return
+    fi
     if awk -v a="$want" -v b="$got" -v t="$tol" 'BEGIN{d=a-b; if (d<0) d=-d; exit !(d<=t)}'; then
         PASS=$((PASS + 1)); printf 'ok   %s\n' "$desc"
     else
@@ -143,13 +150,15 @@ t_close "moon_phase_at +quarter synodic -> 0.25"    0.25 "$(moon_phase_at $((REF
 t_close "moon_phase_at +half synodic -> 0.5 (full)" 0.5  "$(moon_phase_at $((REF + 1275721)))"   0.001
 t_close "moon_phase_at +full synodic +1h -> ~0"     0.0014 "$(moon_phase_at $((REF + 2551443 + 3600)))" 0.001
 t_close "moon_phase_at pre-reference stays in [0,1)" 0.5 "$(moon_phase_at $((REF - 1275721)))"   0.001
+# Rounding edge: ~1.3s before an exact synodic wrap, %.6f rounds to
+# 1.000000 — the guard must map it to 0, never emit "1" (old %.6g did).
+t "moon_phase_at wrap edge stays in [0,1)" "0.000000" "$(moon_phase_at $((REF + 2551442)))"
 
 # --- normalize_is_day: flag normalization + clock fallback --------------------
 
 while read -r raw hour want; do
-    label="${raw/_/<empty>}"
-    t "normalize_is_day '$label' hour=$hour -> $want" "$want" \
-      "$(normalize_is_day "${raw/_/}" "$hour")"
+    t "normalize_is_day '$raw' hour=$hour -> $want" "$want" \
+      "$(normalize_is_day "$raw" "$hour")"
 done <<'EOF'
 1 12 1.0
 1.0 12 1.0
@@ -163,14 +172,23 @@ false 12 0.0
 no 12 0.0
 FALSE 12 0.0
 No 12 0.0
-_ 12 1.0
-_ 05 0.0
-_ 06 1.0
-_ 08 1.0
-_ 17 1.0
-_ 18 0.0
 maybe 12 1.0
 EOF
+
+# Empty input falls back to the clock heuristic...
+t "normalize_is_day '' hour=12 -> 1.0" "1.0" "$(normalize_is_day "" 12)"
+t "normalize_is_day '' hour=05 -> 0.0" "0.0" "$(normalize_is_day "" 05)"
+
+# ...which must agree with the poller's scene_by_hour at EVERY hour — these
+# two day-window definitions live in different scripts and drifting apart
+# would mean a manual swap dims differently than the offline poll fallback.
+mismatch=""
+for i in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23; do
+    h="$(printf '%02d' "$i")"
+    if [[ "$(scene_by_hour "$h")" == "clear-day" ]]; then want_day="1.0"; else want_day="0.0"; fi
+    [[ "$(normalize_is_day "" "$h")" == "$want_day" ]] || mismatch="$mismatch$h "
+done
+t "normalize_is_day clock fallback agrees with scene_by_hour all 24h" "" "$mismatch"
 
 # --- seconds_since_midnight: zero-padded inputs (octal trap) -------------------
 
@@ -178,6 +196,15 @@ t "seconds_since_midnight 00:00:00" "0"     "$(seconds_since_midnight 00 00 00)"
 t "seconds_since_midnight 08:09:07" "29347" "$(seconds_since_midnight 08 09 07)"
 t "seconds_since_midnight 12:00:00" "43200" "$(seconds_since_midnight 12 00 00)"
 t "seconds_since_midnight 23:59:59" "86399" "$(seconds_since_midnight 23 59 59)"
+
+# --- web gallery registry ------------------------------------------------------
+# The gallery derives its scene list from index.html's picker buttons; a
+# scene shipped in shaders/scenes/ but missing a button would silently
+# never appear on the Pages demo (and vice versa for a deleted scene).
+
+fs_scenes="$(cd "$REPO_ROOT/shaders/scenes" && for f in *.glsl; do printf '%s ' "${f%.glsl}"; done)"
+html_scenes="$(grep -oE 'data-scene="[^"]+"' "$REPO_ROOT/web/index.html" | sed -E 's/.*"([^"]+)"/\1/' | sort | tr '\n' ' ')"
+t "web gallery picker offers exactly the shipped scenes" "$fs_scenes" "$html_scenes"
 
 # --- summary -------------------------------------------------------------------
 

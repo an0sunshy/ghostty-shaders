@@ -10,14 +10,15 @@
 # Maintainer task, not CI: needs a local Chrome. Override the binary with
 # CHROME=/path/to/chrome if needed.
 #
-#   scripts/capture-assets.sh [scene ...]     # default: all six
+#   scripts/capture-assets.sh [scene ...]     # default: every shaders/scenes/*.glsl
 
 set -euo pipefail
 
 REPO_ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 PORT="${PORT:-8649}"
-# 1200x750 canvas (16:10) + 31px titlebar.
+# 1200x750 canvas (16:10) + the 31px titlebar (pinned explicitly in
+# web/style.css so a style tweak can't silently crop these captures).
 WIN="1200,781"
 
 if [[ ! -x "$CHROME" && -z "$(command -v "$CHROME" 2>/dev/null)" ]]; then
@@ -25,9 +26,40 @@ if [[ ! -x "$CHROME" && -z "$(command -v "$CHROME" 2>/dev/null)" ]]; then
     exit 1
 fi
 
+shoot() {  # shoot <output.png> <hash-params> [window-size]
+    "$CHROME" --headless --disable-gpu-sandbox \
+        --window-size="${3:-$WIN}" --hide-scrollbars \
+        --virtual-time-budget=4000 \
+        --screenshot="$1" \
+        "http://localhost:$PORT/#$2" 2>/dev/null
+}
+
+# Lightning timestamp for the thunderstorm capture. Only ~30% of the scene's
+# 15-second slots fire (hash-gated in thunderstorm.glsl), so a baked-in t
+# silently produces a flash-less frame the day anyone retunes the scene's
+# timing. Unless GW_STORM_T pins one, sweep the first 12 slots at small size
+# and keep the brightest frame — PNG byte size is the luminance proxy (a
+# flash adds gradient entropy to an otherwise near-black image).
+storm_t() {
+    if [[ -n "${GW_STORM_T:-}" ]]; then
+        echo "$GW_STORM_T"
+        return
+    fi
+    local best="0.06" best_size=0 k t shot size
+    for k in 0 1 2 3 4 5 6 7 8 9 10 11; do
+        t="$(awk -v k="$k" 'BEGIN{printf "%.2f", k*15+0.06}')"
+        shot="$SITE/storm-sweep-$t.png"
+        shoot "$shot" "scene=thunderstorm&embed=1&day=0&t=$t" "400,261"
+        size="$(wc -c <"$shot")"
+        if (( size > best_size )); then best_size=$size; best=$t; fi
+    done
+    echo "storm sweep: brightest frame at t=$best" >&2
+    echo "$best"
+}
+
 # Per-scene hash params: settings each scene looks best under, with a fixed
-# iTime chosen so animated effects are mid-action (the thunderstorm t lands
-# inside a firing lightning slot — re-verify if the scene's hash changes).
+# iTime chosen so animated effects are mid-action. A new scene must get an
+# entry here (the error arm keeps a missing one loud, not silently skipped).
 params_for() {
     case "$1" in
         clear-day)    echo "time=28800&t=2" ;;          # 08:00 morning sun
@@ -35,13 +67,20 @@ params_for() {
         cloudy)       echo "day=1&t=6" ;;
         rain)         echo "day=1&t=5" ;;
         snow)         echo "day=1&t=7" ;;
-        thunderstorm) echo "day=0&t=${GW_STORM_T:-45.06}" ;;  # mid-flash
-        *)            echo "capture-assets.sh: unknown scene: $1" >&2; return 1 ;;
+        thunderstorm) echo "day=0&t=$(storm_t)" ;;
+        *)            echo "capture-assets.sh: no params_for entry for scene: $1" >&2; return 1 ;;
     esac
 }
 
+# Default scene list comes from the filesystem (the source of truth), so a
+# new scene can't be silently left out of the README assets — it fails on
+# the missing params_for entry instead.
 SCENES=("$@")
-[[ ${#SCENES[@]} -gt 0 ]] || SCENES=(clear-day clear-night cloudy rain snow thunderstorm)
+if [[ ${#SCENES[@]} -eq 0 ]]; then
+    for f in "$REPO_ROOT"/shaders/scenes/*.glsl; do
+        SCENES+=("$(basename "$f" .glsl)")
+    done
+fi
 
 SITE="$(mktemp -d "${TMPDIR:-/tmp}/gw-capture.XXXXXX")"
 cleanup() {
@@ -58,16 +97,27 @@ trap cleanup EXIT
 python3 -m http.server "$PORT" --directory "$SITE" >/dev/null 2>&1 &
 SERVER_PID=$!
 disown   # keep bash from reporting the cleanup kill at exit
-sleep 1
+
+# Health-check before shooting anything: a dead server (port already in
+# use) or a foreign one serving stale content would otherwise yield
+# error-page screenshots while the script reports success and exits 0.
+ok=0
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if curl -fsS -o /dev/null "http://localhost:$PORT/scenes/${SCENES[0]}.glsl" 2>/dev/null; then
+        ok=1
+        break
+    fi
+    sleep 0.3
+done
+if [[ $ok -ne 1 ]]; then
+    echo "capture-assets.sh: site server failed to serve on port $PORT (already in use?)" >&2
+    exit 1
+fi
 
 mkdir -p "$REPO_ROOT/assets"
 for s in "${SCENES[@]}"; do
     p="$(params_for "$s")"
     out="$REPO_ROOT/assets/$s.png"
-    "$CHROME" --headless --disable-gpu-sandbox \
-        --window-size="$WIN" --hide-scrollbars \
-        --virtual-time-budget=4000 \
-        --screenshot="$out" \
-        "http://localhost:$PORT/#scene=$s&embed=1&$p" 2>/dev/null
+    shoot "$out" "scene=$s&embed=1&$p"
     echo "captured $out"
 done

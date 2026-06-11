@@ -82,3 +82,9 @@ portability we already have.
   epilogue flips `gl_FragCoord.y` to present Ghostty's convention; the
   bench harness instead leaves the coordinate alone and reads back rows
   bottom-first (see `glsl_image.c`), which lands scene-upright in PNGs.
+- Known debt: the gl410 wrapping still exists as three comment-synced
+  copies (`glsl_bench.c`, `glsl_image.c`, and the `wrap-shader.sh`
+  heredoc), unlike es300's shared files. Single-sourcing it the same way —
+  the C harnesses reading a shared preamble file at runtime — is the
+  obvious next refactor; until then, changing the bench wrapping means
+  updating all three.

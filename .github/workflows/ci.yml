@@ -1,11 +1,15 @@
 name: CI
 
-# push is filtered to main so PR branches don't run everything twice
-# (the pull_request trigger already covers them).
+# push is filtered to main so PR branches don't run everything twice (the
+# pull_request trigger already covers them). Tags get their own runs so a
+# release ref always has CI evidence; workflow_dispatch is the manual
+# escape hatch for un-PR'd branches.
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 
 # Cancel superseded runs for the same ref.
 concurrency:
@@ -53,11 +57,13 @@ jobs:
           printf '  %s\n' "${files[@]}"
           shellcheck "${files[@]}"
 
-      # Every scene must compile under BOTH host profiles: the desktop GL
-      # wrapping the bench harness uses (a stand-in for Ghostty's own
-      # compile) and the WebGL2 ES wrapping the web gallery compiles in the
-      # browser. This is what keeps scenes inside the portable GLSL subset.
-      - name: Validate GLSL scenes (gl410 + es300) with glslangValidator
+      # Every scene must compile under BOTH host profiles (desktop GL = the
+      # bench harness / Ghostty stand-in; es300 = the WebGL2 gallery) and in
+      # BOTH define variants: bare (the #ifndef-fallback path) and --defines
+      # (the injected path that ghostty-weather-swap and the gallery actually
+      # produce — this is what catches a scene that defines a macro without
+      # an #ifndef guard, which is a live "macro redefined" error).
+      - name: Validate GLSL scenes (gl410 + es300, bare + defines)
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -69,13 +75,17 @@ jobs:
           rc=0
           for f in "${scenes[@]}"; do
             for profile in gl410 es300; do
-              frag="/tmp/$(basename "$f" .glsl).$profile.frag"
-              echo "== wrapping $f ($profile) -> $frag"
-              bench/wrap-shader.sh --profile "$profile" "$f" > "$frag"
-              if ! glslangValidator "$frag"; then
-                echo "::error file=$f::glslangValidator failed for $f ($profile)"
-                rc=1
-              fi
+              for variant in bare defines; do
+                args=(--profile "$profile")
+                [ "$variant" = defines ] && args+=(--defines)
+                frag="/tmp/$(basename "$f" .glsl).$profile.$variant.frag"
+                echo "== wrapping $f ($profile, $variant) -> $frag"
+                bench/wrap-shader.sh "${args[@]}" "$f" > "$frag"
+                if ! glslangValidator "$frag"; then
+                  echo "::error file=$f::glslangValidator failed for $f ($profile, $variant)"
+                  rc=1
+                fi
+              done
             done
           done
           exit "$rc"

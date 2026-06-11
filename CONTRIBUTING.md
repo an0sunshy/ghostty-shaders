@@ -88,6 +88,14 @@ maintained in one place so it can't drift.
    git add bench/golden/<name>.png
    ```
 
+6. **Register it in the web gallery.** Add a picker button in
+   `web/index.html` (`data-scene="<name>"` — the gallery derives its scene
+   list from those buttons), a `SCENE_WMO` entry in `web/gallery.js` for
+   the simulated terminal text, and a `params_for` entry in
+   `scripts/capture-assets.sh`. A unit test fails if `shaders/scenes/` and
+   the picker buttons drift apart, and the capture script errors on a
+   scene without params — neither can be skipped silently.
+
 ## Running the checks
 
 All `bin/` scripts and `*.sh` files must pass shellcheck with no errors:

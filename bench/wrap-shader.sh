@@ -22,23 +22,46 @@
 #                     web/glsl/{preamble,epilogue}.glsl — the same files the
 #                     browser fetches — so there is one source of truth.
 #
+# --defines additionally injects the three baked #defines (representative
+# non-default values) between preamble and scene, mirroring what BOTH real
+# hosts compile: ghostty-weather-swap prepends them for Ghostty and
+# web/gallery.js bakes them for the browser. Validating this variant catches
+# scenes that define a macro without an #ifndef guard — a redefinition error
+# live, invisible to the bare wrap. CI validates both variants.
+#
 # Pure text; fully cross-platform (no macOS/GL dependency).
 
 set -euo pipefail
 
 usage() {
-    echo "usage: $0 [--profile gl410|es300] <scene.glsl>" >&2
+    echo "usage: $0 [--profile gl410|es300] [--defines] <scene.glsl>" >&2
+}
+
+# Mirror of the defines ghostty-weather-swap/gallery.js inject. Values are
+# deliberately NOT the scenes' #ifndef fallbacks, so an unguarded #define in
+# a scene produces the same "macro redefined" error here as in production.
+emit_defines() {
+    printf '#define MOON_PHASE 0.37\n'
+    printf '#define IS_DAY 0.0\n'
+    printf '#define TIME_OF_DAY_BASE 28800.0\n'
 }
 
 PROFILE="gl410"
+DEFINES=0
 SCENE=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --profile)   PROFILE="${2:?--profile requires a value}"; shift 2 ;;
         --profile=*) PROFILE="${1#*=}"; shift ;;
+        --defines)   DEFINES=1; shift ;;
         -h|--help)   usage; exit 0 ;;
         -*)          echo "wrap-shader.sh: unknown option: $1" >&2; usage; exit 2 ;;
-        *)           SCENE="$1"; shift ;;
+        *)
+            if [[ -n "$SCENE" ]]; then
+                echo "wrap-shader.sh: multiple scenes given ('$SCENE', '$1') — pass exactly one" >&2
+                exit 2
+            fi
+            SCENE="$1"; shift ;;
     esac
 done
 
@@ -64,8 +87,9 @@ uniform float iTime;
 uniform sampler2D iChannel0;
 uniform vec3  iBackgroundColor;
 out vec4 _ghostty_fragColor;
-#line 1
 PREAMBLE
+    [[ $DEFINES -eq 1 ]] && emit_defines
+    printf '#line 1\n'
 
     cat "$SCENE"
 
@@ -80,10 +104,12 @@ void main() {
 EPILOGUE
     ;;
 es300)
-    # The web gallery assembles preamble + baked #defines + "#line 1" + scene
-    # + epilogue. Validation exercises the no-defines path (every scene must
-    # compile on its #ifndef fallbacks alone).
+    # Same assembly order as web/gallery.js fragmentSource(): preamble,
+    # (baked #defines), "#line 1", scene, epilogue. Without --defines this
+    # exercises the fallback path (scenes must compile on their #ifndef
+    # defaults alone); with it, the injected path real hosts compile.
     cat "$REPO_ROOT/web/glsl/preamble.glsl"
+    [[ $DEFINES -eq 1 ]] && emit_defines
     printf '#line 1\n'
     cat "$SCENE"
     printf '\n'

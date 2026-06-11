@@ -67,6 +67,10 @@ header h1 {
   align-items: center;
   gap: 0.45rem;
   padding: 0.5rem 0.8rem;
+  /* Explicit height: scripts/capture-assets.sh sizes its Chrome window as
+     canvas + titlebar; an emergent (font-dependent) height would silently
+     crop the README captures. */
+  height: 31px;
   background: var(--panel);
   border-bottom: 1px solid var(--panel-edge);
 }

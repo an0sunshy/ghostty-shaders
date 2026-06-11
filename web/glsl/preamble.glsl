@@ -5,7 +5,9 @@
 //
 // Consumed by BOTH web/gallery.js (at runtime, in the browser) and
 // bench/wrap-shader.sh --profile es300 (in CI, via glslangValidator), so
-// the text CI validates is byte-for-byte the text the browser compiles.
+// CI validates the same preamble/epilogue text the browser compiles. The
+// browser additionally bakes #defines between preamble and scene; CI
+// covers that variant too (wrap-shader.sh --defines).
 precision highp float;
 precision highp int;
 uniform vec3  iResolution;

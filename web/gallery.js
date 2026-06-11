@@ -12,9 +12,10 @@
 // compile-time constants there too).
 'use strict';
 
-const SCENE_NAMES = [
-  'clear-day', 'clear-night', 'cloudy', 'rain', 'snow', 'thunderstorm',
-];
+// Derived from the picker buttons in index.html — the single web-side scene
+// registry (a unit test pins those buttons to shaders/scenes/*.glsl).
+const SCENE_NAMES = [...document.querySelectorAll('.scene-picker button')]
+  .map((b) => b.dataset.scene);
 
 // Per-scene flavor for the fake terminal screenful (WMO code + description,
 // mirroring what ghostty-weather-poll logs for that condition).
@@ -139,7 +140,7 @@ function rebuildProgram() {
 // texture; scenes composite their sky BEHIND it. We simulate a screenful.
 
 function terminalLines() {
-  const [wmo, desc] = SCENE_WMO[state.scene];
+  const [wmo, desc] = SCENE_WMO[state.scene] ?? [0, 'clear sky'];
   const day = state.scene === 'clear-night' ? 'night'
     : state.scene === 'clear-day' ? 'day'
     : (state.isDay ? 'day' : 'night');
@@ -157,13 +158,18 @@ function terminalLines() {
   ];
 }
 
+// One reused backing store — a fresh full-framebuffer canvas per rebuild
+// would be ~14 MB of garbage per resize step at dpr 2.
+const termCanvas = document.createElement('canvas');
+const termCtx = termCanvas.getContext('2d');
+
 function rebuildTerminalTexture() {
   const w = canvas.width, h = canvas.height;
   if (w === 0 || h === 0) return;
-  const cv = document.createElement('canvas');
-  cv.width = w;
+  const cv = termCanvas;
+  cv.width = w;            // size assignment also clears the canvas
   cv.height = h;
-  const ctx = cv.getContext('2d');
+  const ctx = termCtx;
   const px = Math.max(12, Math.round(h / 34));
   ctx.font = `${px}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
   ctx.textBaseline = 'top';
@@ -209,25 +215,57 @@ function drawFrame() {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
-function tick() {
-  rafId = requestAnimationFrame(tick);
-  if (needsTexture) { rebuildTerminalTexture(); needsTexture = false; needsDraw = true; }
-  if (needsCompile) { rebuildProgram(); needsCompile = false; needsDraw = true; }
-  if (!program) return;
-  // While paused, still render exactly one frame whenever something changed
-  // (control tweak, resize, recompile, context restore) so the view never
-  // goes stale or blank.
-  if (state.paused && !needsDraw) return;
-  needsDraw = false;
-  drawFrame();
-  if (state.paused) return;
-  frames++;
-  const now = performance.now();
-  if (now - fpsStamp >= 500) {
-    fpsBox.textContent = `· ${Math.round((frames * 1000) / (now - fpsStamp))} fps`;
-    frames = 0;
-    fpsStamp = now;
+let ticking = false;
+
+// Arm the rAF loop if it isn't running. The loop parks itself when paused
+// with nothing pending (a paused tab costs zero CPU — the same
+// don't-burn-the-battery ethos as the terminal version), so every state
+// mutation funnels through here to wake it.
+function ensureTicking() {
+  if (!ticking) {
+    ticking = true;
+    rafId = requestAnimationFrame(tick);
   }
+}
+
+// Slider drags request a recompile per input event; compiling per rAF frame
+// would chain main-thread stalls on slow GLSL compilers (ANGLE/HLSL). The
+// flag persists until consumed, so the final drag position always compiles.
+const COMPILE_MIN_GAP_MS = 150;
+let lastCompileAt = -Infinity;
+
+function tick() {
+  ticking = false;
+  if (needsTexture) { rebuildTerminalTexture(); needsTexture = false; needsDraw = true; }
+  if (needsCompile && performance.now() - lastCompileAt >= COMPILE_MIN_GAP_MS) {
+    rebuildProgram();
+    needsCompile = false;
+    lastCompileAt = performance.now();
+    needsDraw = true;
+  }
+  if (program) {
+    // While paused, still render exactly one frame whenever something
+    // changed (control tweak, resize, recompile, context restore) so the
+    // view never goes stale or blank.
+    if (!state.paused || needsDraw) {
+      needsDraw = false;
+      drawFrame();
+      if (!state.paused) {
+        frames++;
+        const now = performance.now();
+        if (now - fpsStamp >= 500) {
+          fpsBox.textContent = `· ${Math.round((frames * 1000) / (now - fpsStamp))} fps`;
+          frames = 0;
+          fpsStamp = now;
+        }
+      }
+    }
+  } else {
+    needsDraw = false; // nothing can consume it; don't spin while paused
+  }
+  // Keep running while animating or while work is pending (e.g. a throttled
+  // recompile); park otherwise.
+  if (!state.paused || needsCompile || needsTexture || needsDraw) ensureTicking();
 }
 
 // --- errors / status -----------------------------------------------------------
@@ -251,6 +289,12 @@ function moonName(p) {
   return MOON_NAMES[Math.round(p * 8) % 8];
 }
 
+function syncPauseButton() {
+  const btn = $('ctl-pause');
+  btn.setAttribute('aria-pressed', String(state.paused));
+  btn.textContent = state.paused ? '▶ resume' : '⏸ pause';
+}
+
 function syncControls() {
   for (const label of document.querySelectorAll('.controls label[data-for-scene]')) {
     label.hidden = !label.dataset.forScene.split(' ').includes(state.scene);
@@ -262,7 +306,14 @@ function syncControls() {
   $('time-out').value = fmtTime(state.timeOfDay);
 }
 
+// Debounced: slider drags fire per input event, and Safari rate-limits
+// history.replaceState (throws SecurityError past ~100 calls / 30 s).
+let hashTimer = 0;
 function syncHash() {
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(writeHash, 250);
+}
+function writeHash() {
   const p = new URLSearchParams({
     scene: state.scene,
     moon: state.moonPhase.toFixed(2),
@@ -283,7 +334,7 @@ function readHash() {
   if (moon >= 0 && moon < 1) state.moonPhase = moon;
   const time = parseInt(p.get('time'), 10);
   if (time >= 0 && time < 86400) state.timeOfDay = time;
-  if (p.get('day') === '0') state.isDay = false;
+  if (p.has('day')) state.isDay = p.get('day') !== '0';
   // Embed mode: bare terminal window, for iframes and README captures.
   if (p.get('embed') === '1') document.body.classList.add('embed');
   // Fixed time: render exactly one deterministic frame at iTime=t.
@@ -300,6 +351,7 @@ function onStateChange({ recompile = false, retexture = false } = {}) {
   needsDraw = true;
   syncControls();
   syncHash();
+  ensureTicking();
 }
 
 function wireUI() {
@@ -325,18 +377,22 @@ function wireUI() {
     const v = e.target.value;
     state.bg = [1, 3, 5].map((i) => parseInt(v.slice(i, i + 2), 16) / 255);
     needsDraw = true; // uniform only — no recompile needed
+    ensureTicking();
   });
-  $('ctl-pause').addEventListener('click', (e) => {
+  $('ctl-pause').addEventListener('click', () => {
     state.paused = !state.paused;
     if (!state.paused) {
       // Resuming exits fixed-time mode — otherwise the loop would run but
-      // redraw the same frozen iTime forever.
+      // redraw the same frozen iTime forever. Reset the fps window too, or
+      // the first readout would average over the whole paused interval.
       state.fixedTime = null;
       pausedNote = '';
+      frames = 0;
+      fpsStamp = performance.now();
       syncHash();
+      ensureTicking();
     }
-    e.target.setAttribute('aria-pressed', String(state.paused));
-    e.target.textContent = state.paused ? '▶ resume' : '⏸ pause';
+    syncPauseButton();
     fpsBox.textContent = '';
   });
 
@@ -377,15 +433,27 @@ function setupGL() {
 }
 
 function setupResize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const apply = () => {
+    // Read dpr per invocation — it changes when the window moves to a
+    // different-density monitor (cap at 2: fbm per pixel beyond that is
+    // invisible cost).
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const w = Math.round(canvas.clientWidth * dpr);
     const h = Math.round(canvas.clientHeight * dpr);
     if (w === canvas.width && h === canvas.height) return;
     canvas.width = w;
     canvas.height = h;
     needsTexture = true; // tick redraws even while paused (needsDraw)
+    ensureTicking();
   };
+  // ResizeObserver doesn't fire on a monitor move (CSS size is unchanged),
+  // so watch devicePixelRatio via the canonical once-per-value matchMedia
+  // pattern.
+  const watchDpr = () => {
+    matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+      .addEventListener('change', () => { apply(); watchDpr(); }, { once: true });
+  };
+  watchDpr();
   new ResizeObserver(apply).observe(canvas);
   apply();
 }
@@ -417,14 +485,12 @@ async function main() {
     state.paused = true;
     pausedNote = ' (reduced motion)';
   }
-  if (state.paused) {
-    $('ctl-pause').setAttribute('aria-pressed', 'true');
-    $('ctl-pause').textContent = '▶ resume';
-  }
+  syncPauseButton();
 
   canvas.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
     cancelAnimationFrame(rafId);
+    ticking = false;
     statusBox.textContent = 'GPU context lost — waiting for restore…';
   });
   canvas.addEventListener('webglcontextrestored', () => {
@@ -432,10 +498,10 @@ async function main() {
     termTex = null;
     needsCompile = true;
     needsTexture = true;
-    tick();
+    ensureTicking();
   });
 
-  tick();
+  ensureTicking();
 }
 
 main();
