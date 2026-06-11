@@ -1,0 +1,7 @@
+# shellcheck 0.9.x (the version ubuntu-24.04 packages, i.e. what CI runs)
+# raises SC2317 "command appears to be unreachable" for every line of a
+# function whose only caller is a trap — a known false positive fixed in
+# later releases. We have exactly that pattern (truncate_log in
+# bin/ghostty-weather-poll, cleanup in scripts/capture-assets.sh).
+# Disabling it repo-wide keeps CI and newer local shellchecks in agreement.
+disable=SC2317

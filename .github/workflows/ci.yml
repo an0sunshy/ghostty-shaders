@@ -108,6 +108,12 @@ jobs:
   compute-gate:
     name: Compute gate (macOS GPU benchmark)
     runs-on: macos-14
+    # CALIBRATING (docs/publishing.md step 5): the hosted macOS runner is a
+    # VM whose GPU bears no relation to the M1 Max the 5% budget is pinned
+    # to — first real-runner numbers are needed before this can gate. The
+    # job still runs and reports (job summary + artifacts); remove this
+    # once a runner baseline is recorded.
+    continue-on-error: true
     env:
       GHOSTTY_WEATHER_BENCH_JSON: bench-results.json
       GHOSTTY_WEATHER_BENCH_FRAMES: "200"
@@ -119,7 +125,10 @@ jobs:
       - name: Run compute benchmark gate (<5% of frame budget)
         run: bench/run-bench.sh
 
+      # always(): the bench step above may fail while calibrating; the
+      # golden signal is independent and worth seeing every run.
       - name: Golden image check
+        if: always()
         run: bench/golden.sh check
 
       - name: Append results to job summary
