@@ -206,6 +206,94 @@ fs_scenes="$(cd "$REPO_ROOT/shaders/scenes" && for f in *.glsl; do printf '%s ' 
 html_scenes="$(grep -oE 'data-scene="[^"]+"' "$REPO_ROOT/web/index.html" | sed -E 's/.*"([^"]+)"/\1/' | sort | tr '\n' ' ')"
 t "web gallery picker offers exactly the shipped scenes" "$fs_scenes" "$html_scenes"
 
+# --- ghostty_pids_from_ps: the Ghostty process matcher -------------------------
+# Regression for the macOS bug where `pgrep -x ghostty` matched nothing for a
+# .app-bundle launch (comm is the full exec path, which pgrep truncates to 16
+# chars), so swap/toggle silently never signalled Ghostty to reload. swap and
+# toggle now parse `ps -o pid=,comm=` and match the exact comm basename. Pin
+# that: a full path matches, a bare `ghostty` matches, spaces in the path are
+# tolerated, and the match is EXACT so the `ghostty-weather-*` helpers and a
+# `notghostty` binary are excluded (a substring match would catch them).
+#
+# CRITICAL: real `ps -axo pid=,comm=` RIGHT-JUSTIFIES the pid column, so every
+# line starts with leading spaces. These inputs reproduce that exactly — an
+# earlier version used unpadded lines and silently passed while the bare-comm
+# case (Linux / CLI launch) was actually broken.
+
+t "ghostty_pids_from_ps full .app path -> pid" "1306" \
+  "$(printf '%s\n' ' 1306 /Applications/Ghostty.app/Contents/MacOS/ghostty' | ghostty_pids_from_ps)"
+t "ghostty_pids_from_ps padded bare comm 'ghostty' -> pid" "2000" \
+  "$(printf '%s\n' '  2000 ghostty' | ghostty_pids_from_ps)"
+t "ghostty_pids_from_ps tolerates spaces in path" "5000" \
+  "$(printf '%s\n' '  5000 /Apps/My Stuff/ghostty' | ghostty_pids_from_ps)"
+t "ghostty_pids_from_ps excludes ghostty-weather-* helper" "" \
+  "$(printf '%s\n' '  3000 /Users/me/.local/bin/ghostty-weather-poll' | ghostty_pids_from_ps)"
+t "ghostty_pids_from_ps is exact, not substring (notghostty)" "" \
+  "$(printf '%s\n' '  6000 /usr/bin/notghostty' | ghostty_pids_from_ps)"
+t "ghostty_pids_from_ps also matches an unpadded line" "7000" \
+  "$(printf '%s\n' '7000 ghostty' | ghostty_pids_from_ps)"
+t "ghostty_pids_from_ps empty input -> empty" "" \
+  "$(printf '' | ghostty_pids_from_ps)"
+t "ghostty_pids_from_ps filters a mixed ps table" "1306
+2000" "$(printf '%s\n' \
+  ' 1306 /Applications/Ghostty.app/Contents/MacOS/ghostty' \
+  '  2000 ghostty' \
+  '  3000 /usr/bin/ghostty-weather-poll' \
+  '  4000 bash' | ghostty_pids_from_ps)"
+
+# The matcher is intentionally copied into both swap and toggle (standalone
+# executables, no shared lib). Only swap's copy is exercised above (the test
+# sources swap); toggle's runs only as a subprocess. Pin the copies identical
+# so a fix to one can't silently skip the other.
+matcher_of() { awk '/^ghostty_pids_from_ps\(\) \{/,/^}/' "$1"; }
+t "ghostty_pids_from_ps is identical in swap and toggle" \
+  "$(matcher_of "$REPO_ROOT/bin/ghostty-weather-swap")" \
+  "$(matcher_of "$REPO_ROOT/bin/ghostty-weather-toggle")"
+
+# --- toggle lifecycle ----------------------------------------------------------
+# Regression for the `set -e` abort that left active.conf shaderless while the
+# pause marker was never written, so --status wrongly reported "active". Drive
+# the real toggle as a subprocess against a throwaway HOME (all its state lives
+# under $HOME). A stub `ps` on PATH makes the matcher find no Ghostty — that is
+# the exact path that used to abort do_pause, and it stops the test from
+# signalling a real Ghostty that may be running on the dev machine.
+
+TGL="$REPO_ROOT/bin/ghostty-weather-toggle"
+SWP="$REPO_ROOT/bin/ghostty-weather-swap"
+TT_HOME="$(mktemp -d)"
+ACT="$TT_HOME/.config/ghostty-weather/active.conf"
+MRK="$TT_HOME/Library/Caches/ghostty-weather/paused"
+STUB="$TT_HOME/stubbin"
+mkdir -p "$STUB"
+printf '#!/bin/sh\nexit 0\n' > "$STUB/ps"   # pretend no Ghostty is running
+chmod +x "$STUB/ps"
+
+run_tt()    { HOME="$TT_HOME" PATH="$STUB:$PATH" "$@"; }
+has_shader() { if grep -q '^custom-shader' "$ACT" 2>/dev/null; then echo shader; else echo none; fi; }
+has_marker() { if [[ -f $MRK ]]; then echo yes; else echo no; fi; }
+
+run_tt "$SWP" clear-night >/dev/null 2>&1
+t "lifecycle: swap seeds an active shader include" "shader" "$(has_shader)"
+t "lifecycle: active state has no pause marker"     "no"     "$(has_marker)"
+t "lifecycle: --status reports active"              "active" "$(run_tt "$TGL" --status | head -n 1)"
+
+run_tt "$TGL" --pause >/dev/null
+t "lifecycle: --pause writes the pause marker"      "yes"    "$(has_marker)"
+t "lifecycle: --pause leaves a shaderless include"  "none"   "$(has_shader)"
+t "lifecycle: --status reports paused"              "paused" "$(run_tt "$TGL" --status | head -n 1)"
+
+run_tt "$TGL" --pause >/dev/null
+t "lifecycle: --pause is idempotent (still paused)" "yes"    "$(has_marker)"
+
+run_tt "$TGL" --resume >/dev/null 2>&1
+t "lifecycle: --resume clears the pause marker"     "no"     "$(has_marker)"
+t "lifecycle: --resume restores a shader include"   "shader" "$(has_shader)"
+
+run_tt "$TGL" >/dev/null
+t "lifecycle: bare toggle from active pauses"       "yes"    "$(has_marker)"
+
+[[ -n ${TT_HOME:-} && -d $TT_HOME ]] && rm -rf "$TT_HOME"
+
 # --- summary -------------------------------------------------------------------
 
 echo

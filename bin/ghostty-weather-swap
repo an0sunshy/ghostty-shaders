@@ -67,6 +67,27 @@ usage() {
     exit 1
 }
 
+# PIDs from `ps -o pid=,comm=` lines (on stdin) whose comm basename is
+# exactly `ghostty`. Split out as a pure filter — the matcher is the part
+# that subtly breaks, so it is unit-tested in tests/run-tests.sh against
+# realistic ps output (full app path, bare name, helper exclusion). NOTE:
+# `ps` right-justifies the pid column, so each line starts with leading
+# spaces — the `^[[:space:]]*` is load-bearing; without it a bare-comm
+# `ghostty` (CLI/Linux launch) is never matched.
+ghostty_pids_from_ps() {
+    awk '{ pid=$1; sub(/^[[:space:]]*[0-9]+[[:space:]]+/, "")
+           n=split($0, a, "/"); if (a[n] == "ghostty") print pid }'
+}
+
+# PIDs of the running Ghostty terminal, owned by the current user. NOT
+# `pgrep -x ghostty`: when Ghostty is launched from the .app bundle (the
+# normal case on macOS) its accounting name is the full executable path,
+# which pgrep truncates to 16 chars (`/Applications/Gh…`), so `-x ghostty`
+# never matches. Parsing `ps -o comm` and matching the exact basename works
+# whether comm is the full path or a bare `ghostty`. Trailing `|| true`:
+# a `ps`/`awk` failure must not abort the caller under `set -e` + pipefail.
+ghostty_pids() { ps -axo pid=,comm= -U "$(id -u)" | ghostty_pids_from_ps || true; }
+
 # ------------------------------------------------------------ pure helpers
 # Side-effect-free decision logic, unit-tested by tests/run-tests.sh (which
 # sources this script — see the sourced-return guard below the definitions).
@@ -226,11 +247,10 @@ done
 
 # Send SIGUSR2 — Ghostty's macOS AppDelegate installs a handler that calls
 # reloadConfig() (no Accessibility permission needed, unlike a synthesized
-# Cmd+Shift+, keystroke). Restrict the signal to ghostty processes owned
-# by the current user — on multi-user hosts an unscoped `pkill -x ghostty`
-# would try to signal someone else's process and fail (or worse, succeed
-# if root is running it).
-GHOSTTY_PIDS=$(pgrep -x -U "$(id -u)" ghostty || true)
+# Cmd+Shift+, keystroke). ghostty_pids() restricts to ghostty processes
+# owned by the current user — on multi-user hosts signalling someone else's
+# process would fail (or worse, succeed if root is running it).
+GHOSTTY_PIDS=$(ghostty_pids)
 if [[ -z $GHOSTTY_PIDS ]]; then
     echo "swapped: $SCENARIO -> $NEW_NAME (Ghostty not running; will load on next launch)"
     exit 0

@@ -39,11 +39,28 @@ mkdir -p "$CACHE_DIR"
 
 is_paused() { [[ -f $PAUSE_MARKER ]]; }
 
+# Mirrors ghostty-weather-swap (see there for the unit-tested matcher and
+# the full rationale): NOT `pgrep -x ghostty`, because a .app-bundle launch
+# names the process by its full executable path, which pgrep truncates to
+# 16 chars (`/Applications/Gh…`) and never matches. Parse `ps -o comm` and
+# match the exact basename instead; excludes our `ghostty-weather-*` helpers.
+ghostty_pids_from_ps() {
+    awk '{ pid=$1; sub(/^[[:space:]]*[0-9]+[[:space:]]+/, "")
+           n=split($0, a, "/"); if (a[n] == "ghostty") print pid }'
+}
+ghostty_pids() { ps -axo pid=,comm= -U "$(id -u)" | ghostty_pids_from_ps || true; }
+
 ghostty_signal() {
     local pids
-    pids=$(pgrep -x -U "$(id -u)" ghostty || true)
-    # shellcheck disable=SC2086  # $pids is a multi-PID list; word-splitting is intended
-    [[ -n $pids ]] && kill -USR2 $pids
+    pids=$(ghostty_pids)
+    # Guard with an explicit `if`, not `[[ -n $pids ]] && kill …`: when no
+    # Ghostty is running the && short-circuit returns non-zero, which under
+    # `set -e` would abort do_pause *before* it writes the pause marker —
+    # leaving active.conf shaderless while --status still reports "active".
+    if [[ -n $pids ]]; then
+        # shellcheck disable=SC2086  # multi-PID list; word-splitting is intended
+        kill -USR2 $pids
+    fi
 }
 
 do_pause() {
