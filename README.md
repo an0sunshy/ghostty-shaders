@@ -1,7 +1,6 @@
 # ghostty-weather
 
-<!-- Replace OWNER with the GitHub org/user once published -->
-![CI](https://github.com/OWNER/ghostty-weather/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/an0sunshy/ghostty-weather/actions/workflows/ci.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 
 Live, weather-driven background shaders for the [Ghostty](https://ghostty.org)
@@ -13,7 +12,7 @@ open window in place, no restart.
 Text stays fully legible: every scene renders **behind** the terminal contents
 and lets the glyph layer pass through untouched.
 
-**[Live demo →](https://OWNER.github.io/ghostty-weather/)** — every scene
+**[Live demo →](https://an0sunshy.github.io/ghostty-weather/)** — every scene
 running in your browser, with moon-phase, time-of-day, and day/night
 controls. The gallery compiles the **exact** `.glsl` files Ghostty runs,
 wrapped in a short WebGL2 preamble — scenes are written in the
@@ -22,7 +21,7 @@ one under both the desktop GL and WebGL2 profiles.
 
 ## Screenshots
 
-Captured from the [live gallery](https://OWNER.github.io/ghostty-weather/) —
+Captured from the [live gallery](https://an0sunshy.github.io/ghostty-weather/) —
 the exact scene shaders compositing behind a simulated terminal screenful,
 at deterministic timestamps (`scripts/capture-assets.sh` regenerates them).
 
