@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# ghostty-weather-moon-demo — cycle clear-night through every lunar phase
+# ghostty-shaders moon-demo — cycle clear-night through every lunar phase
 # so you can see how the terminator math + surface texture render across
-# the synodic cycle. Each phase displays for DURATION seconds.
+# the synodic cycle. Each phase displays for DURATION seconds. (The
+# `moon-demo` subcommand; entry point is bin/ghostty-shaders.)
 #
 # Usage:
-#   ghostty-weather-moon-demo            # default 5s per phase
-#   ghostty-weather-moon-demo 8          # 8s per phase
+#   ghostty-shaders moon-demo            # default 5s per phase
+#   ghostty-shaders moon-demo 8          # 8s per phase
 #
 # Phases shown (8-step cycle):
 #   0.000  new moon          (only sliver lit at right edge)
@@ -17,10 +18,10 @@
 #   0.750  last quarter      (left half lit)
 #   0.875  waning crescent
 #
-# Implementation: exports GHOSTTY_WEATHER_MOON_PHASE_OVERRIDE which the
-# swap script reads instead of computing the real synodic phase. Cleans
-# up by doing a final swap to clear-night WITHOUT the override so the
-# real current phase resumes.
+# Implementation: exports GHOSTTY_SHADERS_MOON_PHASE_OVERRIDE which the
+# apply subcommand reads instead of computing the real synodic phase. Cleans
+# up by applying clear-night one last time WITHOUT the override so the real
+# current phase resumes.
 
 set -euo pipefail
 
@@ -32,38 +33,37 @@ while [ -L "$SOURCE" ]; do
     [ "${SOURCE#/}" = "$SOURCE" ] && SOURCE="$DIR/$SOURCE"
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
-SWAP="$SCRIPT_DIR/ghostty-weather-swap"
+APPLY="$SCRIPT_DIR/apply"
 DURATION="${1:-5}"
 
 if ! [[ $DURATION =~ ^[0-9]+$ ]]; then
-    echo "usage: $(basename "$0") [seconds-per-phase]" >&2
+    echo "usage: ghostty-shaders moon-demo [seconds-per-phase]" >&2
     exit 1
 fi
 
 PHASES=(
-    "0.000  new moon"
-    "0.125  waxing crescent"
-    "0.250  first quarter"
-    "0.375  waxing gibbous"
-    "0.500  full moon"
-    "0.625  waning gibbous"
-    "0.750  last quarter"
-    "0.875  waning crescent"
+    "0.000 new moon"
+    "0.125 waxing crescent"
+    "0.250 first quarter"
+    "0.375 waxing gibbous"
+    "0.500 full moon"
+    "0.625 waning gibbous"
+    "0.750 last quarter"
+    "0.875 waning crescent"
 )
 
-trap 'echo; echo "demo stopped — restoring real phase..."; unset GHOSTTY_WEATHER_MOON_PHASE_OVERRIDE; "$SWAP" clear-night >/dev/null; exit 0' INT
+trap 'echo; echo "demo stopped — restoring real phase..."; unset GHOSTTY_SHADERS_MOON_PHASE_OVERRIDE; "$APPLY" clear-night >/dev/null; exit 0' INT
 
 echo "moon-phase demo: cycling 8 phases, ${DURATION}s each. Ctrl-C to stop."
 for entry in "${PHASES[@]}"; do
-    phase=${entry%% *}
-    label=${entry#* }
-    label=${label##* }    # trim leading spaces
+    phase=${entry%% *}      # "0.125"
+    label=${entry#* }       # "waxing crescent"
     echo "  $(date +%T)  phase=$phase  $label"
-    GHOSTTY_WEATHER_MOON_PHASE_OVERRIDE="$phase" "$SWAP" clear-night >/dev/null
+    GHOSTTY_SHADERS_MOON_PHASE_OVERRIDE="$phase" "$APPLY" clear-night >/dev/null
     sleep "$DURATION"
 done
 
 # Restore real phase one last time so the user isn't left on whatever
 # the last cycle showed.
-"$SWAP" clear-night >/dev/null
+"$APPLY" clear-night >/dev/null
 echo "done — real lunar phase restored."

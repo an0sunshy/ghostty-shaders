@@ -11,8 +11,8 @@ surface documented in `SECURITY.md` and find the gaps.
 
 ## What you inspect here
 
-- `bin/ghostty-weather-poll`, `bin/ghostty-weather-swap`,
-  `bin/ghostty-weather-toggle`, `install.sh` — all shell that runs on a timer
+- `bin/ghostty-shaders weather`, `bin/ghostty-shaders apply`,
+  `bin/ghostty-shaders toggle`, `install.sh` — all shell that runs on a timer
   or with the user's shell environment.
 - Command injection / unquoted expansions: `$LAT`/`$LON`/`$CITY`/`$LOCATION`
   flowing into `curl`, `printf` into `location.json`, the generated plist
@@ -51,7 +51,7 @@ surface documented in `SECURITY.md` and find the gaps.
 Return findings as a list. Each item:
 
 - `severity`: blocker | major | minor | nit
-- `location`: file:area (e.g. `bin/ghostty-weather-poll:geocode_to_cache`)
+- `location`: file:area (e.g. `bin/ghostty-shaders weather:geocode_to_cache`)
 - `finding`: the concrete weakness and the input that triggers it
 - `suggested fix`: quoting, validation, or doc correction that closes it
 

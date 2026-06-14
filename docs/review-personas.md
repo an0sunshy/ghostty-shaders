@@ -1,6 +1,6 @@
 # Review personas
 
-ghostty-weather ships a small panel of **review personas** — Claude Code
+ghostty-shaders ships a small panel of **review personas** — Claude Code
 subagents under [`.claude/agents/`](../.claude/agents/), each a sharp,
 single-responsibility reviewer with its own charter. They exist so the quality
 bar is *reproducible and shareable* instead of living in one maintainer's head:
@@ -28,7 +28,7 @@ designed to complement, not duplicate, each other — see
 
 | Persona | Owns | What it flags here |
 |---|---|---|
-| [`oss-maintainer`](../.claude/agents/oss-maintainer.md) | Star-worthiness & contribution friction | Missing/placeholder hero visual, absent LICENSE/CONTRIBUTING/CoC/SECURITY, issue & PR templates, scene-name drift across README ↔ `pick_scene()` ↔ `shaders/scenes/`, CHANGELOG/semver hygiene |
+| [`oss-maintainer`](../.claude/agents/oss-maintainer.md) | Star-worthiness & contribution friction | Missing/placeholder hero visual, absent LICENSE/CONTRIBUTING/CoC/SECURITY, issue & PR templates, scene-name drift across README ↔ `pick_scene()` ↔ `shaders/`, CHANGELOG/semver hygiene |
 | [`end-user-advocate`](../.claude/agents/end-user-advocate.md) | Install / upgrade / uninstall UX | `./install.sh` on a clean Mac, the `git pull` upgrade story, no-`jq` / no-network / on-battery behavior, compile-failure auto-revert, clarity of error messages, `toggle`/`--status` |
 | [`security-reviewer`](../.claude/agents/security-reviewer.md) | Threat model of the bash + install footprint | Command injection / unquoted expansions, `curl` usage, the LaunchAgent plist & `config-file` include, `SIGUSR2` targeting, location privacy (direct LAT/LON = zero 3P calls), no secrets in logs — cross-checked against [`SECURITY.md`](../SECURITY.md) |
 | [`perf-gpu-engineer`](../.claude/agents/perf-gpu-engineer.md) | The compute gate & benchmark fidelity | Any scene over 5% of the 8.33 ms/120 Hz budget, un-gated per-pixel fbm, octave creep, regressions vs `bench/baseline.json`, the Metal-vs-OpenGL proxy caveat, the Apple-Silicon "cheaper hash doesn't help" trap |
@@ -41,7 +41,7 @@ designed to complement, not duplicate, each other — see
 persona directly — through the Task tool, or in plain language:
 
 > use the perf-gpu-engineer subagent to review the cloudy.glsl change
->> use the accessibility-legibility subagent on shaders/scenes/snow.glsl
+>> use the accessibility-legibility subagent on shaders/weather/snow.glsl
 
 The subagent reads only what its charter names, runs the relevant commands
 (`bench/run-bench.sh`, `shellcheck`, `glslangValidator`, `bench/golden.sh check`),

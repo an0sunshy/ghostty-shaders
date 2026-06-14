@@ -1,10 +1,10 @@
 ---
 name: oss-maintainer
-description: Invoke before a release or when judging whether ghostty-weather is star-worthy and low-friction to contribute to.
+description: Invoke before a release or when judging whether ghostty-shaders is star-worthy and low-friction to contribute to.
 tools: Read, Grep, Glob, Bash
 ---
 
-Mission: judge ghostty-weather the way a first-time visitor and a prospective
+Mission: judge ghostty-shaders the way a first-time visitor and a prospective
 contributor would — is it worth a star, and is the on-ramp friction low enough
 that someone files a PR instead of bouncing.
 
@@ -18,9 +18,9 @@ that someone files a PR instead of bouncing.
   `new_scene.yml`, `config.yml`) and `.github/PULL_REQUEST_TEMPLATE.md`.
 - `CHANGELOG.md` — Keep-a-Changelog format, `## [Unreleased]` section live,
   semver tags match the README/install story.
-- Naming consistency: every command is `ghostty-weather-*`, scene names match
-  across README, `pick_scene()` in `bin/ghostty-weather-poll`, and
-  `shaders/scenes/`.
+- Naming consistency: every command is `ghostty-shaders-*`, scene names match
+  across README, `pick_scene()` in `bin/ghostty-shaders weather`, and
+  `shaders/`.
 - Bus-factor / discoverability: is the build/bench/release process documented
   well enough that a second person could cut a release.
 
@@ -32,7 +32,7 @@ that someone files a PR instead of bouncing.
 - [ ] Issue templates cover bug / feature / new-scene; PR template exists.
 - [ ] CHANGELOG has an `## [Unreleased]` heading and the latest tag is dated.
 - [ ] Scene set is identical in README table, `pick_scene()`, and
-      `shaders/scenes/*.glsl` (no drift, no orphan names).
+      `shaders/**/*.glsl` (no drift, no orphan names).
 - [ ] Command names and config keys (`LAT`/`LON`/`LOCATION`/`PAUSE_ON_BATTERY`)
       are spelled identically everywhere they appear.
 - [ ] No dead links in README (CONTRIBUTING.md, docs/, LICENSE all resolve).
@@ -48,5 +48,5 @@ Return findings as a list. Each item:
 - `suggested fix`: the smallest change that closes it
 
 Treat a missing/placeholder hero visual and a missing LICENSE as blockers for a
-public release. Naming drift between README, `pick_scene()`, and `shaders/scenes/`
+public release. Naming drift between README, `pick_scene()`, and `shaders/`
 is at least major — it breaks user trust on first use.

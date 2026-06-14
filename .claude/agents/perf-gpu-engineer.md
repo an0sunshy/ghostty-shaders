@@ -12,14 +12,14 @@ full-screen every visible frame — cost is `pixels × refresh × per-pixel work
 
 - `bench/run-bench.sh` — the gate: builds `glsl_bench`, benchmarks baseline +
   all scenes at 3456×2234 / 120 Hz, exits non-zero on any `OVER`. Tunables:
-  `GHOSTTY_WEATHER_BUDGET_PCT`, `_BENCH_W/_H`, `_REFRESH_HZ`, `_FRAMES`,
+  `GHOSTTY_SHADERS_BUDGET_PCT`, `_BENCH_W/_H`, `_REFRESH_HZ`, `_FRAMES`,
   `_TRIALS`.
 - `bench/glsl_bench.c` — the harness: off-screen CGL/OpenGL 4.1 context, the
   four Ghostty uniforms (`iResolution`, `iTime`, `iChannel0`,
   `iBackgroundColor`), additive blend to defeat tile-GPU dead-frame elimination.
 - `bench/baseline.json` — recorded per-scene numbers; watch for regressions vs
   the committed baseline, not just the absolute threshold.
-- `shaders/scenes/*.glsl` — the per-pixel cost. Hunt un-gated fbm: noise
+- `shaders/**/*.glsl` — the per-pixel cost. Hunt un-gated fbm: noise
   evaluated across the whole screen instead of inside the region that uses it
   (the `clear-night` moon-disk gate and `cloudy` sky-band gate are the model),
   and octave creep in `*Fbm()` loops.
@@ -36,7 +36,7 @@ full-screen every visible frame — cost is `pixels × refresh × per-pixel work
 - [ ] The harness still wraps exactly Ghostty's four uniforms and keeps the
       additive-blend trick (otherwise timings collapse to zero).
 - [ ] Threshold/resolution/refresh remain the documented defaults; a passing
-      run never relies on a quietly loosened `GHOSTTY_WEATHER_BUDGET_PCT`.
+      run never relies on a quietly loosened `GHOSTTY_SHADERS_BUDGET_PCT`.
 - [ ] Optimizations preserve the scene's visual character (cross-check with the
       golden image / visual-regression-qa, not just the timing).
 
@@ -45,7 +45,7 @@ full-screen every visible frame — cost is `pixels × refresh × per-pixel work
 Return findings as a list. Each item:
 
 - `severity`: blocker | major | minor | nit
-- `location`: file:area (e.g. `shaders/scenes/cloudy.glsl:fbm`)
+- `location`: file:area (e.g. `shaders/weather/cloudy.glsl:fbm`)
 - `finding`: the cost driver, with the bench number or octave/region detail
 - `suggested fix`: gate the noise, cut octaves/samples, or update baseline
 

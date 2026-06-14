@@ -16,7 +16,7 @@ across the cross-hardware fp caveat.
 - `bench/glsl_image.c` — the headless renderer that produces a deterministic
   PNG per scene (CGL/OpenGL, same uniforms as the bench harness).
 - `bench/golden/` — the committed reference PNGs; one per scene under
-  `shaders/scenes/*.glsl`. No scene should be missing a golden, and no golden
+  `shaders/**/*.glsl`. No scene should be missing a golden, and no golden
   should be orphaned (no matching scene).
 - Determinism of inputs: golden renders must pin a fixed `iTime`, a transparent
   (or fixed) `iChannel0`, fixed resolution, and fixed `iBackgroundColor` — any
@@ -30,7 +30,7 @@ across the cross-hardware fp caveat.
 
 ## Checklist
 
-- [ ] A golden reference exists for every scene in `shaders/scenes/`; none
+- [ ] A golden reference exists for every scene in `shaders/`; none
       orphaned.
 - [ ] `bench/golden.sh check` passes on an unchanged tree.
 - [ ] Golden renders pin fixed `iTime`, deterministic `iChannel0`

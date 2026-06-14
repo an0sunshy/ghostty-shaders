@@ -10,11 +10,13 @@
 # Maintainer task, not CI: needs a local Chrome. Override the binary with
 # CHROME=/path/to/chrome if needed.
 #
-#   scripts/capture-assets.sh [scene ...]     # default: every shaders/scenes/*.glsl
+#   scripts/capture-assets.sh [scene ...]     # default: every scene under shaders/
 
 set -euo pipefail
 
 REPO_ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
+# shellcheck source=scene-discovery.sh disable=SC1091
+. "$REPO_ROOT/scripts/scene-discovery.sh"
 CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 PORT="${PORT:-8649}"
 # 1200x750 canvas (16:10) + the 31px titlebar (pinned explicitly in
@@ -77,9 +79,9 @@ params_for() {
 # the missing params_for entry instead.
 SCENES=("$@")
 if [[ ${#SCENES[@]} -eq 0 ]]; then
-    for f in "$REPO_ROOT"/shaders/scenes/*.glsl; do
-        SCENES+=("$(basename "$f" .glsl)")
-    done
+    while IFS= read -r name; do
+        SCENES+=("$name")
+    done < <(scene_names "$REPO_ROOT/shaders")
 fi
 
 SITE="$(mktemp -d "${TMPDIR:-/tmp}/gw-capture.XXXXXX")"

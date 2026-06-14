@@ -9,7 +9,7 @@ set -euo pipefail
 PORT="${1:-8642}"
 REPO_ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 
-SITE="$(mktemp -d "${TMPDIR:-/tmp}/ghostty-weather-site.XXXXXX")"
+SITE="$(mktemp -d "${TMPDIR:-/tmp}/ghostty-shaders-site.XXXXXX")"
 trap 'rm -rf "$SITE"' EXIT
 
 "$REPO_ROOT/scripts/build-site.sh" "$SITE"

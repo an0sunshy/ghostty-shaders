@@ -14,7 +14,7 @@
 //   quarter, and crescents in between. Verified against all four cardinal
 //   phases.
 //
-// MOON_PHASE is baked at swap time by bin/ghostty-weather-swap from the
+// MOON_PHASE is baked at swap time by bin/ghostty-shaders apply from the
 // current synodic cycle (~29.53d). Falls back to full if missing.
 
 #ifndef MOON_PHASE

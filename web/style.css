@@ -1,4 +1,4 @@
-/* ghostty-weather gallery — dark, minimal, no framework. */
+/* ghostty-shaders gallery — dark, minimal, no framework. */
 
 :root {
   --bg: #0e1016;
@@ -35,11 +35,29 @@ header h1 {
 
 .scene-picker {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-direction: column;   /* a column of collection groups */
+  gap: 1rem;
   margin: 1.5rem 0 1rem;
 }
+.scene-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.group-label {
+  width: 100%;              /* force the buttons onto the next row */
+  margin-bottom: 0.1rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #787c99;
+}
+.group-label small { text-transform: none; letter-spacing: 0; opacity: 0.85; }
 .scene-picker button {
+  display: inline-flex;
+  flex-direction: column;   /* Chinese label over its English subtitle */
+  align-items: flex-start;
+  gap: 0.05rem;
   padding: 0.45rem 0.9rem;
   border: 1px solid var(--panel-edge);
   border-radius: 8px;
@@ -53,6 +71,10 @@ header h1 {
 .scene-picker button[aria-pressed="true"] {
   border-color: var(--accent);
   background: #1d2435;
+}
+.scene-picker button .btn-en {
+  font-size: 0.72rem;
+  color: #787c99;           /* muted — the English gloss, visible at a glance */
 }
 
 .terminal-window {
@@ -99,6 +121,42 @@ header h1 {
   white-space: pre-wrap;
 }
 #no-webgl2 { font: inherit; color: var(--fg); }
+
+/* Play affordance shown over the frozen frame when the gallery auto-pauses
+   because the OS has Reduce Motion on — so a static scene reads as "click to
+   play", not "broken". Click anywhere on it resumes. */
+#play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  margin: 0;
+  border: 0;
+  cursor: pointer;
+  background: rgb(8 10 18 / 0.5);
+  color: var(--fg);
+  font: inherit;
+  text-align: center;
+}
+#play-overlay[hidden] { display: none; }
+#play-overlay .play-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  padding-left: 0.2rem;            /* optical-centre the ▶ glyph */
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.14);
+  font-size: 1.4rem;
+  transition: background 0.12s ease;
+}
+#play-overlay:hover .play-icon,
+#play-overlay:focus-visible .play-icon { background: rgb(255 255 255 / 0.26); }
+#play-overlay .play-label { max-width: 22rem; font-size: 0.8rem; opacity: 0.88; }
 
 .controls {
   display: flex;

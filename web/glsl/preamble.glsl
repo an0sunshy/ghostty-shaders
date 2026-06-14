@@ -1,5 +1,5 @@
 #version 300 es
-// WebGL2 (GLSL ES 3.00) preamble for ghostty-weather scenes — the web
+// WebGL2 (GLSL ES 3.00) preamble for ghostty-shaders scenes — the web
 // gallery's equivalent of the preamble Ghostty injects at runtime. It
 // declares exactly the four uniforms Ghostty supplies and nothing else.
 //

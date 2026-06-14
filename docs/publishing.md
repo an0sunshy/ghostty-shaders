@@ -22,7 +22,7 @@ per-release manual step — day-to-day quality gates live in CI.
 3. **Create the repo and push** (public, empty — no auto-README):
 
    ```sh
-   gh repo create <owner>/ghostty-weather --public --source . --push
+   gh repo create <owner>/ghostty-shaders --public --source . --push
    ```
 
 4. **Repository settings:**
@@ -42,19 +42,19 @@ per-release manual step — day-to-day quality gates live in CI.
    golden-image check have only ever run on the maintainer's M1 Max;
    GitHub's `macos-14` runner is a VM with different GPU behavior.
    - If the **compute gate** fails or is noisy: raise the CI budget via
-     `GHOSTTY_WEATHER_BUDGET_PCT` in `ci.yml` (the local 5% gate on real
+     `GHOSTTY_SHADERS_BUDGET_PCT` in `ci.yml` (the local 5% gate on real
      hardware remains the contract; the CI number is a regression tripwire,
      not the spec). Record whatever the runner measures as its own
      baseline.
    - If the **golden check** drifts with unchanged shaders: that's GPU
-     variance, not regression — bump `GHOSTTY_WEATHER_GOLDEN_TOLERANCE`
+     variance, not regression — bump `GHOSTTY_SHADERS_GOLDEN_TOLERANCE`
      for CI per the policy in `bench/golden.sh`'s header. Do NOT
      regenerate the committed goldens on a CI runner.
 
 6. **Tag and release v0.1.0:**
 
    ```sh
-   git tag -a v0.1.0 -m "ghostty-weather v0.1.0"
+   git tag -a v0.1.0 -m "ghostty-shaders v0.1.0"
    git push origin v0.1.0
    gh release create v0.1.0 --title "v0.1.0" \
      --notes-file <(sed -n '/^## \[0.1.0\]/,/^\[/p' CHANGELOG.md | sed '$d')

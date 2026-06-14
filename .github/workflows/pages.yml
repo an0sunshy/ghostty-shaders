@@ -1,6 +1,6 @@
 name: Deploy Pages
 
-# Publishes the WebGL2 scene gallery (web/ + shaders/scenes/, assembled by
+# Publishes the WebGL2 scene gallery (web/ + shaders/, assembled by
 # scripts/build-site.sh) to GitHub Pages. Requires Pages to be enabled with
 # "GitHub Actions" as the source in the repository settings.
 

@@ -1,10 +1,10 @@
-// ghostty-weather gallery — WebGL2 player for the scene shaders.
+// ghostty-shaders gallery — WebGL2 player for the scene shaders.
 //
 // Scenes are fetched VERBATIM from scenes/*.glsl (the same files Ghostty
 // compiles) and assembled exactly like the terminal pipeline does:
 //
 //   preamble (glsl/preamble.glsl)   <- the host's uniform declarations
-//   baked #defines                  <- what ghostty-weather-swap injects
+//   baked #defines                  <- what ghostty-shaders apply injects
 //   #line 1 + scene + epilogue      <- Shadertoy body driven by main()
 //
 // Control changes re-bake the defines and recompile, which is faithfully
@@ -13,12 +13,12 @@
 'use strict';
 
 // Derived from the picker buttons in index.html — the single web-side scene
-// registry (a unit test pins those buttons to shaders/scenes/*.glsl).
+// registry (a unit test pins those buttons to shaders/**/*.glsl).
 const SCENE_NAMES = [...document.querySelectorAll('.scene-picker button')]
   .map((b) => b.dataset.scene);
 
 // Per-scene flavor for the fake terminal screenful (WMO code + description,
-// mirroring what ghostty-weather-poll logs for that condition).
+// mirroring what ghostty-shaders weather logs for that condition).
 const SCENE_WMO = {
   'clear-day':    [0,  'clear sky'],
   'clear-night':  [0,  'clear sky'],
@@ -41,6 +41,12 @@ const state = {
   bg: [0x16 / 255, 0x18 / 255, 0x1f / 255],
   paused: false,
   fixedTime: null,  // #t=<secs>: freeze iTime for deterministic captures
+  poemIntensity: 1.0, // poem-* POC: additive-tint scale
+  ss: 1,              // GW_SS supersample factor (compute<->clarity dial)
+  mood: 0.0,          // GW_MOOD    feeling dial: -1 cold/blue .. +1 warm
+  energy: 1.0,        // GW_ENERGY  feeling dial: motion speed (still..lively)
+  density: 1.0,       // GW_DENSITY feeling dial: fill vs 留白 (sparse..lush)
+  glow: 1.0,          // GW_GLOW    feeling dial: bloom/softness (crisp..dreamy)
 };
 
 const $ = (id) => document.getElementById(id);
@@ -67,11 +73,17 @@ let fpsStamp = performance.now();
 
 function bakeDefines() {
   // Always bake all three; every scene #ifndef-guards the ones it uses and
-  // silently ignores the rest — same contract as ghostty-weather-swap.
+  // silently ignores the rest — same contract as ghostty-shaders apply.
   return [
     `#define MOON_PHASE ${state.moonPhase.toFixed(4)}`,
     `#define IS_DAY ${state.isDay ? '1.0' : '0.0'}`,
     `#define TIME_OF_DAY_BASE ${state.timeOfDay.toFixed(1)}`,
+    `#define GW_POEM_INTENSITY ${state.poemIntensity.toFixed(2)}`,
+    `#define GW_SS ${state.ss}`,
+    `#define GW_MOOD ${state.mood.toFixed(2)}`,
+    `#define GW_ENERGY ${state.energy.toFixed(2)}`,
+    `#define GW_DENSITY ${state.density.toFixed(2)}`,
+    `#define GW_GLOW ${state.glow.toFixed(2)}`,
   ].join('\n');
 }
 
@@ -145,13 +157,13 @@ function terminalLines() {
     : state.scene === 'clear-day' ? 'day'
     : (state.isDay ? 'day' : 'night');
   return [
-    ['$ ', 'ghostty-weather-poll'],
+    ['$ ', 'ghostty-shaders weather'],
     ['', `poll: 47.61,-122.33 -> WMO ${wmo} (${desc}) · ${day}`],
     ['', `swap: scene=${state.scene} -> weather-20260610.glsl`],
     ['', 'swap: SIGUSR2 -> reloaded 3 surfaces in place'],
     ['', ''],
-    ['$ ', 'ghostty-weather-toggle --status'],
-    ['', `scene: ${state.scene} · paused: no · poller: every 15 min`],
+    ['$ ', 'ghostty-shaders toggle --status'],
+    ['', `scene: ${state.scene} · paused: no · poller: every 5 min`],
     ['', ''],
     ['# ', 'text stays legible: scenes render behind the glyphs'],
     ['$ ', '█'],
@@ -295,6 +307,29 @@ function syncPauseButton() {
   btn.textContent = state.paused ? '▶ resume' : '⏸ pause';
 }
 
+// The "click to play" overlay only appears for the Reduce-Motion auto-pause —
+// never for a deliberate manual pause or a fixed-time (#t=) capture.
+function setPlayOverlay(show) {
+  const ov = $('play-overlay');
+  if (ov) ov.hidden = !show;
+}
+
+// Resume playback from any paused state (manual, reduced-motion, or fixed-time)
+// and clear the overlay. Mirrors the un-pause arm of the pause button.
+function resume() {
+  if (!state.paused) return;
+  state.paused = false;
+  state.fixedTime = null;
+  pausedNote = '';
+  frames = 0;
+  fpsStamp = performance.now();
+  syncHash();
+  ensureTicking();
+  syncPauseButton();
+  setPlayOverlay(false);
+  fpsBox.textContent = '';
+}
+
 function syncControls() {
   for (const label of document.querySelectorAll('.controls label[data-for-scene]')) {
     label.hidden = !label.dataset.forScene.split(' ').includes(state.scene);
@@ -304,6 +339,12 @@ function syncControls() {
   }
   $('moon-out').value = moonName(state.moonPhase);
   $('time-out').value = fmtTime(state.timeOfDay);
+  $('poem-out').value = state.poemIntensity.toFixed(2);
+  $('ss-out').value = `${state.ss}×`;
+  $('mood-out').value = state.mood.toFixed(2);
+  $('energy-out').value = state.energy.toFixed(2);
+  $('density-out').value = state.density.toFixed(2);
+  $('glow-out').value = state.glow.toFixed(2);
 }
 
 // Debounced: slider drags fire per input event, and Safari rate-limits
@@ -319,6 +360,12 @@ function writeHash() {
     moon: state.moonPhase.toFixed(2),
     time: String(state.timeOfDay),
     day: state.isDay ? '1' : '0',
+    ss: String(state.ss),
+    pi: state.poemIntensity.toFixed(2),
+    md: state.mood.toFixed(2),
+    en: state.energy.toFixed(2),
+    de: state.density.toFixed(2),
+    gl: state.glow.toFixed(2),
   });
   // Keep capture/embed params so the URL stays a faithful reproduction of
   // what's on screen.
@@ -335,6 +382,18 @@ function readHash() {
   const time = parseInt(p.get('time'), 10);
   if (time >= 0 && time < 86400) state.timeOfDay = time;
   if (p.has('day')) state.isDay = p.get('day') !== '0';
+  const ss = parseInt(p.get('ss'), 10);
+  if (ss >= 1 && ss <= 4) state.ss = ss;
+  const pi = parseFloat(p.get('pi'));
+  if (pi >= 0 && pi <= 2) state.poemIntensity = pi;
+  const md = parseFloat(p.get('md'));
+  if (md >= -1 && md <= 1) state.mood = md;
+  const en = parseFloat(p.get('en'));
+  if (en >= 0.3 && en <= 2) state.energy = en;
+  const de = parseFloat(p.get('de'));
+  if (de >= 0.3 && de <= 1.8) state.density = de;
+  const gl = parseFloat(p.get('gl'));
+  if (gl >= 0.6 && gl <= 2.5) state.glow = gl;
   // Embed mode: bare terminal window, for iframes and README captures.
   if (p.get('embed') === '1') document.body.classList.add('embed');
   // Fixed time: render exactly one deterministic frame at iTime=t.
@@ -360,6 +419,20 @@ function wireUI() {
       state.scene = btn.dataset.scene;
       onStateChange({ recompile: true, retexture: true });
     });
+    // Surface the English title as a visible subtitle on poem buttons. Derived
+    // from the title attr (which a unit test pins to collections/poems.titles),
+    // so there's no second copy of the English to keep in sync.
+    const en = (btn.getAttribute('title') || '').split(' — ')[1];
+    if (en) {
+      const zh = document.createElement('span');
+      zh.className = 'btn-zh';
+      zh.textContent = btn.textContent.trim();
+      const enEl = document.createElement('span');
+      enEl.className = 'btn-en';
+      enEl.textContent = en;
+      btn.textContent = '';
+      btn.append(zh, enEl);
+    }
   }
   $('ctl-moon').addEventListener('input', (e) => {
     state.moonPhase = parseFloat(e.target.value);
@@ -373,6 +446,20 @@ function wireUI() {
     state.isDay = e.target.checked;
     onStateChange({ recompile: true, retexture: true });
   });
+  $('ctl-poem').addEventListener('input', (e) => {
+    state.poemIntensity = parseFloat(e.target.value);
+    onStateChange({ recompile: true });
+  });
+  $('ctl-ss').addEventListener('input', (e) => {
+    state.ss = parseInt(e.target.value, 10);
+    onStateChange({ recompile: true });
+  });
+  for (const [id, key] of [['ctl-mood','mood'],['ctl-energy','energy'],['ctl-density','density'],['ctl-glow','glow']]) {
+    $(id).addEventListener('input', (e) => {
+      state[key] = parseFloat(e.target.value);
+      onStateChange({ recompile: true });
+    });
+  }
   $('ctl-bg').addEventListener('input', (e) => {
     const v = e.target.value;
     state.bg = [1, 3, 5].map((i) => parseInt(v.slice(i, i + 2), 16) / 255);
@@ -380,26 +467,27 @@ function wireUI() {
     ensureTicking();
   });
   $('ctl-pause').addEventListener('click', () => {
-    state.paused = !state.paused;
-    if (!state.paused) {
-      // Resuming exits fixed-time mode — otherwise the loop would run but
-      // redraw the same frozen iTime forever. Reset the fps window too, or
-      // the first readout would average over the whole paused interval.
-      state.fixedTime = null;
-      pausedNote = '';
-      frames = 0;
-      fpsStamp = performance.now();
-      syncHash();
-      ensureTicking();
-    }
+    // Resuming exits fixed-time mode — otherwise the loop would run but redraw
+    // the same frozen iTime forever — and resets the fps window. resume() does
+    // all of that; here we only handle the manual pause arm.
+    if (state.paused) { resume(); return; }
+    state.paused = true;
+    setPlayOverlay(false);   // a deliberate pause needs no "click to play" hint
     syncPauseButton();
     fpsBox.textContent = '';
   });
+  $('play-overlay').addEventListener('click', resume);
 
   // Reflect hash-set control values back into the inputs.
   $('ctl-moon').value = String(state.moonPhase);
   $('ctl-time').value = String(state.timeOfDay);
   $('ctl-day').checked = state.isDay;
+  $('ctl-poem').value = String(state.poemIntensity);
+  $('ctl-ss').value = String(state.ss);
+  $('ctl-mood').value = String(state.mood);
+  $('ctl-energy').value = String(state.energy);
+  $('ctl-density').value = String(state.density);
+  $('ctl-glow').value = String(state.glow);
 }
 
 // --- boot ----------------------------------------------------------------------
@@ -486,6 +574,7 @@ async function main() {
     pausedNote = ' (reduced motion)';
   }
   syncPauseButton();
+  setPlayOverlay(state.paused && pausedNote === ' (reduced motion)');
 
   canvas.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();

@@ -1,5 +1,5 @@
 {
-  // Relaxed markdownlint config for ghostty-weather docs.
+  // Relaxed markdownlint config for ghostty-shaders docs.
   "config": {
     "MD013": false, // line-length: long lines / tables are fine
     "MD033": false, // inline HTML allowed (badges, <details>, etc.)

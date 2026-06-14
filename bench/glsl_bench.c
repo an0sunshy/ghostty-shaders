@@ -1,4 +1,4 @@
-// glsl_bench — headless GPU timing for ghostty-weather scene shaders.
+// glsl_bench — headless GPU timing for ghostty-shaders scene shaders.
 //
 // Creates an off-screen OpenGL 4.1 core context via CGL (no window, no GLFW —
 // only macOS system frameworks), wraps a Shadertoy-style scene with the four

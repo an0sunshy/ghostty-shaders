@@ -1,4 +1,4 @@
-// glsl_image — deterministic single-frame render of a ghostty-weather scene,
+// glsl_image — deterministic single-frame render of a ghostty-shaders scene,
 // for golden-image visual-regression testing.
 //
 // Shares glsl_bench.c's headless CGL/OpenGL 4.1 approach (off-screen FBO, no
@@ -132,7 +132,7 @@ static GLuint build_program(const char *scene_src) {
 
 // Render one deterministic frame of `scene_src` at W x H into a freshly-malloc'd
 // RGBA8 buffer (scene-upright rows, ready for PNG). Returns NULL on failure.
-static unsigned char *render_frame(const char *scene_src, int W, int H) {
+static unsigned char *render_frame(const char *scene_src, int W, int H, float frame_time) {
     CGLPixelFormatAttribute attrs[] = {
         kCGLPFAAccelerated,
         kCGLPFAOpenGLProfile, (CGLPixelFormatAttribute)kCGLOGLPVersion_GL4_Core,
@@ -177,7 +177,7 @@ static unsigned char *render_frame(const char *scene_src, int W, int H) {
     glUniform3f(glGetUniformLocation(prog, "iResolution"), (float)W, (float)H, 1.0f);
     glUniform3f(glGetUniformLocation(prog, "iBackgroundColor"), 0.07f, 0.09f, 0.12f);
     GLint uTime = glGetUniformLocation(prog, "iTime");
-    if (uTime >= 0) glUniform1f(uTime, DEFAULT_TIME);
+    if (uTime >= 0) glUniform1f(uTime, frame_time);
 
     // 1x1 fully-transparent-black glyph layer → text contributes nothing.
     GLuint tex;
@@ -218,8 +218,8 @@ static unsigned char *render_frame(const char *scene_src, int W, int H) {
 
 static void usage(const char *prog) {
     fprintf(stderr,
-        "usage: %s <scene.glsl> --write <out.png> [W H]\n"
-        "       %s <scene.glsl> --compare <ref.png> [--tolerance MEANABSDIFF] [W H]\n",
+        "usage: %s <scene.glsl> --write <out.png> [--time S] [W H]\n"
+        "       %s <scene.glsl> --compare <ref.png> [--tolerance MEANABSDIFF] [--time S] [W H]\n",
         prog, prog);
 }
 
@@ -233,14 +233,19 @@ int main(int argc, char **argv) {
 
     int W = DEFAULT_W, H = DEFAULT_H;
     double tolerance = DEFAULT_TOL;
+    float frame_time = DEFAULT_TIME;
 
-    // Parse the trailing optional args: [--tolerance T] [W H], any order
-    // (tolerance only meaningful for --compare).
+    // Parse the trailing optional args: [--tolerance T] [--time S] [W H], any
+    // order (tolerance only meaningful for --compare; --time picks the animated
+    // frame so callers can inspect motion, default DEFAULT_TIME).
     int pos = 0;            // count of positional W/H seen
     for (int i = 4; i < argc; i++) {
         if (strcmp(argv[i], "--tolerance") == 0) {
             if (i + 1 >= argc) { fprintf(stderr, "--tolerance needs a value\n"); return 2; }
             tolerance = atof(argv[++i]);
+        } else if (strcmp(argv[i], "--time") == 0) {
+            if (i + 1 >= argc) { fprintf(stderr, "--time needs a value\n"); return 2; }
+            frame_time = (float)atof(argv[++i]);
         } else if (pos == 0) {
             W = atoi(argv[i]); pos++;
         } else if (pos == 1) {
@@ -255,7 +260,7 @@ int main(int argc, char **argv) {
     if (!scene) return 1;
 
     if (strcmp(mode, "--write") == 0) {
-        unsigned char *img = render_frame(scene, W, H);
+        unsigned char *img = render_frame(scene, W, H, frame_time);
         free(scene);
         if (!img) return 1;
         if (!stbi_write_png(png_path, W, H, 4, img, W * 4)) {
@@ -279,7 +284,7 @@ int main(int argc, char **argv) {
         }
         // Re-render at the reference's dimensions (any positional W/H is ignored
         // when comparing — the reference defines the canvas).
-        unsigned char *img = render_frame(scene, rw, rh);
+        unsigned char *img = render_frame(scene, rw, rh, frame_time);
         free(scene);
         if (!img) { stbi_image_free(ref); return 1; }
 

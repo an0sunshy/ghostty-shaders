@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in ghostty-weather is broken or behaving unexpectedly.
+description: Something in ghostty-shaders is broken or behaving unexpectedly.
 title: "[bug]: "
 labels: ["bug"]
 body:
@@ -66,7 +66,7 @@ body:
     attributes:
       label: Relevant log lines
       description: >
-        The poll log lives at `~/Library/Logs/ghostty-weather-poll.log` on
+        The poll log lives at `~/Library/Logs/ghostty-shaders-poll.log` on
         macOS. Paste any relevant lines (compile errors, revert messages, etc.).
       render: text
     validations:
@@ -78,7 +78,7 @@ body:
       label: Steps to reproduce
       description: How can we reproduce this? Include the exact commands you ran.
       placeholder: |
-        1. ghostty-weather-swap rain
+        1. ghostty-shaders apply rain
         2. Observe ...
     validations:
       required: true

@@ -37,7 +37,7 @@ jobs:
           set -euo pipefail
           # Collect scripts from each location that exists; tolerate absent dirs.
           files=()
-          for pattern in bin/* install.sh bench/*.sh scripts/* tests/*; do
+          for pattern in bin/* libexec/ghostty-shaders/* install.sh bench/*.sh scripts/* tests/*; do
             for f in $pattern; do
               [ -f "$f" ] || continue
               case "$f" in
@@ -60,16 +60,15 @@ jobs:
       # Every scene must compile under BOTH host profiles (desktop GL = the
       # bench harness / Ghostty stand-in; es300 = the WebGL2 gallery) and in
       # BOTH define variants: bare (the #ifndef-fallback path) and --defines
-      # (the injected path that ghostty-weather-swap and the gallery actually
+      # (the injected path that ghostty-shaders apply and the gallery actually
       # produce — this is what catches a scene that defines a macro without
       # an #ifndef guard, which is a live "macro redefined" error).
       - name: Validate GLSL scenes (gl410 + es300, bare + defines)
         run: |
           set -euo pipefail
-          shopt -s nullglob
-          scenes=(shaders/scenes/*.glsl)
+          mapfile -t scenes < <(find shaders -type f -name '*.glsl' | sort)
           if [ "${#scenes[@]}" -eq 0 ]; then
-            echo "No scenes found under shaders/scenes/." >&2
+            echo "No scenes found under shaders/." >&2
             exit 1
           fi
           rc=0
@@ -115,9 +114,9 @@ jobs:
     # once a runner baseline is recorded.
     continue-on-error: true
     env:
-      GHOSTTY_WEATHER_BENCH_JSON: bench-results.json
-      GHOSTTY_WEATHER_BENCH_FRAMES: "200"
-      GHOSTTY_WEATHER_BENCH_TRIALS: "5"
+      GHOSTTY_SHADERS_BENCH_JSON: bench-results.json
+      GHOSTTY_SHADERS_BENCH_FRAMES: "200"
+      GHOSTTY_SHADERS_BENCH_TRIALS: "5"
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -135,7 +134,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "## ghostty-weather compute gate"
+            echo "## ghostty-shaders compute gate"
             echo
             if [ -f bench-results.json ]; then
               echo '```json'

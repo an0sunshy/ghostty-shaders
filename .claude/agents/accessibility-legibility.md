@@ -11,7 +11,7 @@ light-background terminals. This is the highest-value reviewer; be rigorous.
 
 ## What you inspect here
 
-- `shaders/scenes/*.glsl` — the composite tail of every scene. The glyph layer
+- `shaders/**/*.glsl` — the composite tail of every scene. The glyph layer
   must pass through untouched:
 
   ```glsl
@@ -53,7 +53,7 @@ light-background terminals. This is the highest-value reviewer; be rigorous.
 Return findings as a list. Each item:
 
 - `severity`: blocker | major | minor | nit
-- `location`: file:area (e.g. `shaders/scenes/thunderstorm.glsl:flash`)
+- `location`: file:area (e.g. `shaders/weather/thunderstorm.glsl:flash`)
 - `finding`: the legibility/accessibility risk, with the line or term at fault
 - `suggested fix`: restore the passthrough, cap brightness, gate by `IS_DAY`,
   or bound the motion/flash

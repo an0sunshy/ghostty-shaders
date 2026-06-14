@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# ghostty-shaders — weather- and poem-driven background shaders for the
+# Ghostty terminal. This is the single entry point; it dispatches to the
+# implementation modules under libexec/ghostty-shaders/.
+#
+# Subcommands:
+#   use <scene>              pin one scene and keep it (static selection)
+#   random [collection]      pin a random scene (from a collection, or any)
+#   apply <scene>            apply one scene now without pinning it
+#   list [collection]        list collections, or one collection's scenes
+#   weather [on|off|set-city <name>]
+#                            weather mode: poll once, or enable/disable the poller
+#   toggle [--pause|--resume|--status]
+#                            pause / resume the active shader
+#   demo [secs]              cycle the weather scenes for a showcase
+#   moon-demo [secs]         cycle clear-night through the lunar phases
+#
+# Scenes live in shaders/<collection>/<name>.glsl (e.g. shaders/weather/rain.glsl,
+# shaders/poems/jing-ye-si.glsl). Scene names are globally unique.
+#
+# Selection model: `use`/`random` pin a scene (the cron weather poller then
+# stands down so it isn't clobbered); `weather`/`weather on` return to
+# weather mode. Per-new-window random rotation is documented but not yet
+# wired — see docs/random-per-window.md.
+
+set -euo pipefail
+
+# Resolve this script's real directory, following symlinks so it works when
+# invoked via a ~/.local/bin symlink. Portable: bare `readlink` only (no
+# `readlink -f`, which BSD/macOS lack).
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+    DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [ "${SOURCE#/}" = "$SOURCE" ] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+LIBEXEC="$REPO_DIR/libexec/ghostty-shaders"
+SHADERS_DIR="$REPO_DIR/shaders"
+COLLECTIONS_DIR="$REPO_DIR/collections"
+SELECTION_FILE="$HOME/.config/ghostty-shaders/selection"
+
+# shellcheck source=../scripts/scene-discovery.sh disable=SC1091
+. "$REPO_DIR/scripts/scene-discovery.sh"
+
+usage() {
+    sed -n '2,23{s/^# \?//;p;}' "$0" >&2
+    exit "${1:-1}"
+}
+
+# Record a static pick so the cron weather poller stands down. The scene is
+# also applied (by the caller) — this only persists the *choice*.
+pin_selection() {
+    mkdir -p "$(dirname "$SELECTION_FILE")"
+    printf '%s\n' "$1" > "$SELECTION_FILE"
+}
+
+# One-line human description of a collection, from collections/<name>.conf.
+collection_desc() {
+    local conf="$COLLECTIONS_DIR/$1.conf"
+    [ -f "$conf" ] || return 0
+    sed -nE 's/^[[:space:]]*description[[:space:]]*=[[:space:]]*(.*)$/\1/p' "$conf" | head -1
+}
+
+# Display title for one scene ("中文 (pinyin) — English") from the optional
+# collections/<collection>.titles file (pipe-delimited name|zh|en). Empty when
+# the collection has no titles file (e.g. weather, whose names speak for
+# themselves).
+scene_title() {
+    local tf="$COLLECTIONS_DIR/$1.titles"
+    [ -f "$tf" ] || return 0
+    awk -F'|' -v n="$2" '$1==n { print $2 " — " $3; exit }' "$tf"
+}
+
+# `use <scene>` — pin a scene and apply it (static selection).
+cmd_use() {
+    local scene="${1:-}"
+    [ -n "$scene" ] || { echo "usage: ghostty-shaders use <scene>" >&2; exit 1; }
+    scene_path "$SHADERS_DIR" "$scene" >/dev/null \
+        || { echo "ghostty-shaders: no such scene '$scene' (try 'ghostty-shaders list')" >&2; exit 1; }
+    pin_selection "$scene"
+    exec "$LIBEXEC/apply" "$scene"
+}
+
+# `random [collection]` — pin and apply a random scene. With a collection name,
+# pick from that collection only; otherwise from every scene.
+cmd_random() {
+    local want="${1:-}" root="$SHADERS_DIR"
+    if [ -n "$want" ]; then
+        root="$SHADERS_DIR/$want"
+        [ -d "$root" ] || { echo "ghostty-shaders: no such collection '$want' (try 'ghostty-shaders list')" >&2; exit 1; }
+    fi
+    local names=() n
+    while IFS= read -r n; do names+=("$n"); done < <(scene_names "$root")
+    [ "${#names[@]}" -gt 0 ] || { echo "ghostty-shaders: no scenes found under $root" >&2; exit 1; }
+    local pick="${names[RANDOM % ${#names[@]}]}"
+    pin_selection "$pick"
+    echo "random pick: $pick"
+    exec "$LIBEXEC/apply" "$pick"
+}
+
+# `list` — collections + descriptions, or one collection's scene names.
+cmd_list() {
+    local want="${1:-}" dir cat count desc s meta
+    if [ -n "$want" ]; then
+        [ -d "$SHADERS_DIR/$want" ] || { echo "ghostty-shaders: no such collection '$want'" >&2; exit 1; }
+        while IFS= read -r s; do
+            meta=$(scene_title "$want" "$s")
+            if [ -n "$meta" ]; then printf '%-24s %s\n' "$s" "$meta"; else printf '%s\n' "$s"; fi
+        done < <(scene_names "$SHADERS_DIR/$want")
+        return 0
+    fi
+    echo "collections (scenes in shaders/<collection>/):"
+    echo
+    for dir in "$SHADERS_DIR"/*/; do
+        [ -d "$dir" ] || continue
+        cat=$(basename "$dir")
+        count=$(scene_names "$dir" | wc -l | tr -d ' ')
+        desc=$(collection_desc "$cat")
+        printf '  %-9s (%2s)   %s\n' "$cat" "$count" "$desc"
+    done
+    echo
+    echo "list a collection's scenes:  ghostty-shaders list <collection>"
+    echo "pin one scene:               ghostty-shaders use <scene>"
+    echo "pin a random one:            ghostty-shaders random [collection]"
+}
+
+cmd="${1:-}"
+[ "$#" -gt 0 ] && shift || true
+
+case "$cmd" in
+    use)       cmd_use "$@" ;;
+    random)    cmd_random "$@" ;;
+    apply)     exec "$LIBEXEC/apply" "$@" ;;
+    toggle)    exec "$LIBEXEC/toggle" "$@" ;;
+    demo)      exec "$LIBEXEC/demo" "$@" ;;
+    moon-demo) exec "$LIBEXEC/moon-demo" "$@" ;;
+    list)      cmd_list "$@" ;;
+    weather)
+        case "${1:-}" in
+            # `weather on` returns to weather mode: drop any static pin, then
+            # install the cron poller.
+            on)            rm -f "$SELECTION_FILE"; exec "$LIBEXEC/weather" --install ;;
+            off)           exec "$LIBEXEC/weather" --uninstall ;;
+            set-city)      shift; exec "$LIBEXEC/weather" --set-city "$@" ;;
+            ""|once)       exec "$LIBEXEC/weather" ;;
+            *) echo "usage: ghostty-shaders weather [on|off|set-city <name>]" >&2; exit 1 ;;
+        esac ;;
+    -h|--help|help) usage 0 ;;
+    "")        usage ;;
+    *)         echo "ghostty-shaders: unknown subcommand '$cmd'" >&2; usage ;;
+esac

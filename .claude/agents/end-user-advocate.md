@@ -13,15 +13,15 @@ uninstalling later. Every failure mode must be legible and recoverable.
 - `install.sh` — clean-Mac path: symlinks into `~/.local/bin`, the
   `config-file = ?…/active.conf` include written to Ghostty's secondary config,
   and `--with-poller`, `--uninstall` flags.
-- `bin/ghostty-weather-poll` — the `--install` / `--uninstall` LaunchAgent
+- `bin/ghostty-shaders weather` — the `--install` / `--uninstall` LaunchAgent
   flow, `--set-city`, `--help`, the seeded `config.env`, and the fallback chain
   in `read_location()` (LAT/LON → LOCATION → location.json → NYC fallback warn).
 - Degraded conditions: no `jq` (grep fallbacks in `read_*`/`pick_scene`), no
   network (`curl … || true` → cached response < 6h → `scene_by_hour`), on
   battery (`PAUSE_ON_BATTERY`, the battery/manual-resume markers).
-- `bin/ghostty-weather-swap` — the compile-failure auto-revert (reads Ghostty's
+- `bin/ghostty-shaders apply` — the compile-failure auto-revert (reads Ghostty's
   log, restores the previous shader) and filename rotation.
-- `bin/ghostty-weather-toggle` — pause / resume / `--status` clarity.
+- `bin/ghostty-shaders toggle` — pause / resume / `--status` clarity.
 - The `git pull` upgrade story: symlinks keep working, no re-install needed.
 
 ## Checklist

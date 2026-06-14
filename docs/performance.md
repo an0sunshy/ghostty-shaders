@@ -28,8 +28,8 @@ and the order-of-magnitude budget % are sound — which is what the gate needs.
 
 ## Tuning a scene
 
-Tunables are environment variables (`GHOSTTY_WEATHER_BENCH_W`/`_H`,
-`GHOSTTY_WEATHER_REFRESH_HZ`, `GHOSTTY_WEATHER_BUDGET_PCT`); see the script
+Tunables are environment variables (`GHOSTTY_SHADERS_BENCH_W`/`_H`,
+`GHOSTTY_SHADERS_REFRESH_HZ`, `GHOSTTY_SHADERS_BUDGET_PCT`); see the script
 header. The dominant cost driver is procedural noise (fbm) evaluated per pixel,
 so the levers that matter are **gating** it to where it is actually visible and
 **reducing octaves / samples** — on Apple Silicon a cheaper *hash* does not

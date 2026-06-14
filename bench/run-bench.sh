@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# run-bench.sh — measure the GPU cost of every ghostty-weather scene as a
+# run-bench.sh — measure the GPU cost of every ghostty-shaders scene as a
 # percentage of the display's per-frame budget, and gate on a threshold.
 #
 # Builds the headless glsl_bench harness (if needed), benchmarks a trivial
-# passthrough baseline plus all 6 scenes at the given resolution, and prints a
+# passthrough baseline plus every scene at the given resolution, and prints a
 # table of ms/frame, % of the frame budget, and a baseline-normalized ratio
 # (scene median / baseline median). The ratio cancels runner-speed variance,
 # so it is comparable across machines and CI runners in a way absolute ms is
@@ -16,14 +16,14 @@
 # GPU time the rest of the system (and other windows) need.
 #
 # Tunables (env):
-#   GHOSTTY_WEATHER_BENCH_W / _H      resolution (default 3456 x 2234, the
+#   GHOSTTY_SHADERS_BENCH_W / _H      resolution (default 3456 x 2234, the
 #                                      built-in Retina panel — worst case)
-#   GHOSTTY_WEATHER_REFRESH_HZ        refresh rate (default 120 = ProMotion)
-#   GHOSTTY_WEATHER_BUDGET_PCT        pass/fail threshold (default 5.0)
-#   GHOSTTY_WEATHER_BENCH_FRAMES      frames per trial (default 400)
-#   GHOSTTY_WEATHER_BENCH_TRIALS      trials, median reported (default 7)
-#   GHOSTTY_WEATHER_BENCH_JSON        if set, write a JSON array of results here
-#   GHOSTTY_WEATHER_REGRESSION_PCT    max allowed slowdown vs baseline.json
+#   GHOSTTY_SHADERS_REFRESH_HZ        refresh rate (default 120 = ProMotion)
+#   GHOSTTY_SHADERS_BUDGET_PCT        pass/fail threshold (default 5.0)
+#   GHOSTTY_SHADERS_BENCH_FRAMES      frames per trial (default 400)
+#   GHOSTTY_SHADERS_BENCH_TRIALS      trials, median reported (default 7)
+#   GHOSTTY_SHADERS_BENCH_JSON        if set, write a JSON array of results here
+#   GHOSTTY_SHADERS_REGRESSION_PCT    max allowed slowdown vs baseline.json
 #                                      before FAIL (default 50)
 #
 # Flags:
@@ -37,19 +37,21 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-SCENES_DIR="$SCRIPT_DIR/../shaders/scenes"
+SHADERS_DIR="$SCRIPT_DIR/../shaders"
+# shellcheck source=../scripts/scene-discovery.sh disable=SC1091
+. "$SCRIPT_DIR/../scripts/scene-discovery.sh"
 BIN="$SCRIPT_DIR/glsl_bench"
 SRC="$SCRIPT_DIR/glsl_bench.c"
 BASELINE_FILE="$SCRIPT_DIR/baseline.json"
 
-W="${GHOSTTY_WEATHER_BENCH_W:-3456}"
-H="${GHOSTTY_WEATHER_BENCH_H:-2234}"
-REFRESH="${GHOSTTY_WEATHER_REFRESH_HZ:-120}"
-THRESH="${GHOSTTY_WEATHER_BUDGET_PCT:-5.0}"
-FRAMES="${GHOSTTY_WEATHER_BENCH_FRAMES:-400}"
-TRIALS="${GHOSTTY_WEATHER_BENCH_TRIALS:-7}"
-JSON_OUT="${GHOSTTY_WEATHER_BENCH_JSON:-}"
-REGRESSION_PCT="${GHOSTTY_WEATHER_REGRESSION_PCT:-50}"
+W="${GHOSTTY_SHADERS_BENCH_W:-3456}"
+H="${GHOSTTY_SHADERS_BENCH_H:-2234}"
+REFRESH="${GHOSTTY_SHADERS_REFRESH_HZ:-120}"
+THRESH="${GHOSTTY_SHADERS_BUDGET_PCT:-5.0}"
+FRAMES="${GHOSTTY_SHADERS_BENCH_FRAMES:-400}"
+TRIALS="${GHOSTTY_SHADERS_BENCH_TRIALS:-7}"
+JSON_OUT="${GHOSTTY_SHADERS_BENCH_JSON:-}"
+REGRESSION_PCT="${GHOSTTY_SHADERS_REGRESSION_PCT:-50}"
 
 UPDATE_BASELINE=0
 for arg in "$@"; do
@@ -73,16 +75,16 @@ fi
 BUDGET_MS=$(awk -v r="$REFRESH" 'BEGIN{ printf "%.4f", 1000.0/r }')
 
 echo
-echo "ghostty-weather scene compute benchmark"
+echo "ghostty-shaders scene compute benchmark"
 echo "  resolution : ${W} x ${H}  ($(awk -v w="$W" -v h="$H" 'BEGIN{printf "%.1f", w*h/1e6}') Mpx)"
 echo "  refresh    : ${REFRESH} Hz   frame budget : ${BUDGET_MS} ms"
-echo "  threshold  : ${THRESH}% of budget   (${FRAMES} frames x ${TRIALS} trials, median)"
+echo "  threshold  : ${THRESH}% of budget (default; collections/<c>.conf budget_pct overrides)   (${FRAMES} frames x ${TRIALS} trials, median)"
 echo
 printf "  %-14s %12s %12s %10s %8s   %s\n" "scene" "median(ms)" "min(ms)" "%budget" "ratio" "verdict"
 printf "  %-14s %12s %12s %10s %8s   %s\n" "--------------" "----------" "--------" "-------" "-----" "-------"
 
 # Baseline first (passthrough), then every scene, sorted.
-SCENES=$(find "$SCENES_DIR" -maxdepth 1 -name '*.glsl' -exec basename {} .glsl \; | sort)
+SCENES=$(scene_names "$SHADERS_DIR")
 
 # Accumulators, kept as parallel newline-delimited lists (bash-portable, no
 # associative arrays needed). Each line: "<label> <median> <min> <pct> <ratio>".
@@ -90,10 +92,21 @@ RESULTS=""
 BASELINE_MEDIAN=""
 over_count=0
 
+# Per-collection budget: collections/<name>.conf may set `budget_pct = N` so an
+# opt-in art collection (e.g. poems, selected by hand) gets a higher ceiling than
+# the always-on weather default. Falls back to the global THRESH when unset.
+# Same conf format the dispatcher's collection_desc() reads.
+collection_budget() {
+    local conf="$SCRIPT_DIR/../collections/$1.conf" v=""
+    [[ -f "$conf" ]] && v=$(sed -nE 's/^[[:space:]]*budget_pct[[:space:]]*=[[:space:]]*([0-9.]+).*/\1/p' "$conf" | head -1)
+    printf '%s' "${v:-$THRESH}"
+}
+
 # Measure one target. Stores median/min/pct/ratio into RESULTS; the baseline
 # call must run first so BASELINE_MEDIAN is set for the ratio of every scene.
+# $3 = budget % for this scene's collection (defaults to the global THRESH).
 run_one() {
-    local label="$1" arg="$2"
+    local label="$1" arg="$2" thr="${3:-$THRESH}"
     local out median min pct ratio verdict
     out=$("$BIN" "$arg" "$W" "$H" "$FRAMES" "$TRIALS" 2>/dev/null) || {
         printf "  %-14s %12s\n" "$label" "ERROR"
@@ -110,8 +123,8 @@ run_one() {
     else
         ratio=$(awk -v m="$median" -v b="$BASELINE_MEDIAN" \
             'BEGIN{ if (b > 0) printf "%.2f", m/b; else printf "n/a" }')
-        if awk -v p="$pct" -v t="$THRESH" 'BEGIN{ exit !(p > t) }'; then
-            verdict="OVER"
+        if awk -v p="$pct" -v t="$thr" 'BEGIN{ exit !(p > t) }'; then
+            verdict="OVER (>${thr}%)"
             over_count=$((over_count + 1))
         else
             verdict="ok"
@@ -125,7 +138,9 @@ run_one() {
 run_one "baseline" "--baseline"
 while IFS= read -r s; do
     [[ -n "$s" ]] || continue
-    run_one "$s" "$SCENES_DIR/$s.glsl"
+    sp="$(scene_path "$SHADERS_DIR" "$s")"
+    coll="$(basename "$(dirname "$sp")")"
+    run_one "$s" "$sp" "$(collection_budget "$coll")"
 done <<< "$SCENES"
 
 echo
@@ -193,7 +208,7 @@ fi
 # --- Final verdict ----------------------------------------------------------
 status=0
 if [[ "$over_count" -gt 0 ]]; then
-    echo "RESULT: $over_count scene(s) exceed ${THRESH}% of the frame budget." >&2
+    echo "RESULT: $over_count scene(s) exceed their collection's frame budget." >&2
     status=1
 fi
 if [[ "$regression_count" -gt 0 ]]; then
@@ -201,7 +216,7 @@ if [[ "$regression_count" -gt 0 ]]; then
     status=1
 fi
 if [[ "$status" -eq 0 ]]; then
-    msg="RESULT: all scenes within ${THRESH}% of the frame budget"
+    msg="RESULT: all scenes within their collection's frame budget"
     [[ -f "$BASELINE_FILE" ]] && msg="$msg and within ${REGRESSION_PCT}% of baseline"
     echo "${msg}."
 fi

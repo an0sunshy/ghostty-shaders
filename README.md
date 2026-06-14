@@ -1,18 +1,24 @@
-# ghostty-weather
+# ghostty-shaders
 
-![CI](https://github.com/an0sunshy/ghostty-weather/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/an0sunshy/ghostty-shaders/actions/workflows/ci.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 
-Live, weather-driven background shaders for the [Ghostty](https://ghostty.org)
-terminal. A small daemon polls your local weather every 15 minutes and swaps
-Ghostty's `custom-shader` to match — clear day, clear night (with a
-phase-accurate moon), clouds, rain, snow, or thunderstorm — reloading every
-open window in place, no restart.
+Live background shaders for the [Ghostty](https://ghostty.org) terminal,
+organized into **collections** you can run two ways:
 
-Text stays fully legible: every scene renders **behind** the terminal contents
+- **weather** — a small daemon polls your local weather every 5 minutes and
+  swaps Ghostty's `custom-shader` to match (clear day, clear night with a
+  phase-accurate moon, clouds, rain, snow, thunderstorm), reloading every open
+  window in place, no restart.
+- **poems** — 37 animated scenes evoking the 意境 of classical Chinese poems
+  (静夜思, 春江花月夜, 江雪, …). Pin one with `ghostty-shaders use <scene>` and
+  keep it, or `ghostty-shaders random` for a fresh one.
+
+More collections can be added as `shaders/<collection>/` folders. Text stays
+fully legible either way: every scene renders **behind** the terminal contents
 and lets the glyph layer pass through untouched.
 
-**[Live demo →](https://an0sunshy.github.io/ghostty-weather/)** — every scene
+**[Live demo →](https://an0sunshy.github.io/ghostty-shaders/)** — every scene
 running in your browser, with moon-phase, time-of-day, and day/night
 controls. The gallery compiles the **exact** `.glsl` files Ghostty runs,
 wrapped in a short WebGL2 preamble — scenes are written in the
@@ -21,7 +27,7 @@ one under both the desktop GL and WebGL2 profiles.
 
 ## Screenshots
 
-Captured from the [live gallery](https://an0sunshy.github.io/ghostty-weather/) —
+Captured from the [live gallery](https://an0sunshy.github.io/ghostty-shaders/) —
 the exact scene shaders compositing behind a simulated terminal screenful,
 at deterministic timestamps (`scripts/capture-assets.sh` regenerates them).
 
@@ -39,19 +45,19 @@ at deterministic timestamps (`scripts/capture-assets.sh` regenerates them).
 ## How it works
 
 ```text
- ┌─ ghostty-weather-poll ─┐      ┌─ ghostty-weather-swap ─┐      ┌─ Ghostty ─┐
+ ┌─ ghostty-shaders weather ─┐      ┌─ ghostty-shaders apply ─┐      ┌─ Ghostty ─┐
  │ Open-Meteo current     │      │ pick scene .glsl       │      │ reload    │
  │ weather + is_day  ─────┼─────▶│ bake moon-phase/time   │─────▶│ config    │
- │ (LaunchAgent, 15 min)  │      │ write active.conf      │      │ recompile │
+ │ (LaunchAgent, 5 min)  │      │ write active.conf      │      │ recompile │
  └────────────────────────┘      │ kill -USR2 ghostty ────┼─────▶│ shader    │
                                   └────────────────────────┘      └───────────┘
 ```
 
-1. **`ghostty-weather-poll`** fetches the current condition from Open-Meteo
+1. **`ghostty-shaders weather`** fetches the current condition from Open-Meteo
    (free, no API key) for your location and maps the
    [WMO weather code](https://open-meteo.com/en/docs) + day/night flag to a scene.
-2. **`ghostty-weather-swap`** copies that scene to a fresh file under
-   `~/Library/Caches/ghostty-weather/`, bakes in the current time-of-day and
+2. **`ghostty-shaders apply`** copies that scene to a fresh file under
+   `~/Library/Caches/ghostty-shaders/`, bakes in the current time-of-day and
    moon phase as `#define`s, and points `active.conf` at it.
 3. **Ghostty** reloads on `SIGUSR2` and recompiles the shader for every open
    surface — the new sky appears within a frame.
@@ -63,36 +69,60 @@ the previous one, so a bad edit never leaves you shaderless.
 
 - **Ghostty** with `SIGUSR2` config-reload support (tested on 1.3.1).
 - **macOS** for the automatic poller (`launchd`) and the compile-validation
-  step (`/usr/bin/log`). The shaders and the manual `swap`/`toggle`/`demo`
-  commands work on Linux Ghostty too — see [Cross-platform](#cross-platform).
+  step (`/usr/bin/log`). The shaders and the manual `apply`/`toggle`/`demo`
+  subcommands work on Linux Ghostty too — see [Cross-platform](#cross-platform).
 - `curl`. `jq` is optional (used if present; there's a grep fallback).
 
 ## Install
 
 ```sh
-git clone https://github.com/an0sunshy/ghostty-weather.git ~/dev/ghostty-weather
-cd ~/dev/ghostty-weather
-./install.sh                 # links commands + wires the Ghostty include
+git clone https://github.com/an0sunshy/ghostty-shaders.git ~/dev/ghostty-shaders
+cd ~/dev/ghostty-shaders
+./install.sh                 # links the command + wires the Ghostty include
 # or, in one shot, also start the auto-poller:
 ./install.sh --with-poller
 ```
 
-`install.sh` symlinks the commands into `~/.local/bin` and adds an absolute
+`install.sh` symlinks the `ghostty-shaders` command into `~/.local/bin` and adds an absolute
 `config-file = ?…/active.conf` line to Ghostty's always-loaded secondary
 config (`~/Library/Application Support/com.mitchellh.ghostty/config` on macOS),
 so it works regardless of how your main config is managed.
 
 ## Usage
 
+There are two modes. **Static** — pin a scene and keep it:
+
 ```sh
-ghostty-weather-swap clear-night     # apply a scene now (manual)
-ghostty-weather-toggle               # pause / resume the shader
-ghostty-weather-toggle --status      # show current scene / paused state
-ghostty-weather-poll                 # poll once and swap to match weather
-ghostty-weather-poll --install       # install the 15-min LaunchAgent
-ghostty-weather-poll --uninstall     # remove it
-ghostty-weather-demo [seconds]       # cycle every scene for a visual review
-ghostty-weather-moon-demo [seconds]  # cycle clear-night through all 8 lunar phases
+ghostty-shaders list                  # collections and their scene counts
+ghostty-shaders list poems            # the scene names in one collection
+ghostty-shaders use jing-ye-si        # pin one scene and keep it
+ghostty-shaders random poems          # pin a random scene from a collection
+ghostty-shaders random                # ... or from any collection
+```
+
+**Weather** — let the poller drive the scene from live conditions:
+
+```sh
+ghostty-shaders weather               # poll once and apply the matching scene
+ghostty-shaders weather on            # install the 5-min auto-poller
+ghostty-shaders weather off           # remove it
+```
+
+The poller runs every **5 minutes** by default; to change it, set the interval
+(in seconds) when you enable it:
+`GHOSTTY_SHADERS_POLL_INTERVAL=600 ghostty-shaders weather on`.
+
+While a scene is pinned with `use`/`random`, the cron poller stands down so it
+won't clobber your pick; any `weather` command returns you to weather mode.
+Per-new-window random rotation is [deferred](docs/random-per-window.md). Other
+commands:
+
+```sh
+ghostty-shaders apply clear-night     # apply a scene once, without pinning it
+ghostty-shaders toggle                # pause / resume the active shader
+ghostty-shaders toggle --status       # show current scene / paused state
+ghostty-shaders demo [seconds]        # cycle the weather scenes for a visual review
+ghostty-shaders moon-demo [seconds]   # cycle clear-night through all 8 lunar phases
 ```
 
 Scenes: `clear-day` · `clear-night` · `cloudy` · `rain` · `snow` ·
@@ -100,7 +130,7 @@ Scenes: `clear-day` · `clear-night` · `cloudy` · `rain` · `snow` ·
 
 ## Configuration
 
-Location and behavior live in `~/.config/ghostty-weather/config.env`:
+Location and behavior live in `~/.config/ghostty-shaders/config.env`:
 
 ```sh
 # Pick ONE location source.
@@ -117,11 +147,28 @@ PAUSE_ON_BATTERY=true
 Or set the location interactively:
 
 ```sh
-ghostty-weather-poll --set-city "Seattle, WA"
+ghostty-shaders weather set-city "Seattle, WA"
 ```
 
 Direct `LAT`/`LON` make **zero** third-party calls. A city/ZIP is geocoded a
 single time and cached in `location.json`; subsequent polls reuse it.
+
+### Poem feeling dials
+
+Each poem scene reads four "feeling" dials so you can tune its 意境 without
+touching the shader. Set them as env vars when you pin a scene — they bake into
+the applied shader — and every dial defaults to the scene's authored look:
+
+```sh
+GHOSTTY_SHADERS_MOOD=-1      # cold/blue ‹0› warm/tender    (-1 … 1)
+GHOSTTY_SHADERS_ENERGY=1.4   # still ‹1› lively (motion)    (0.3 … 2)
+GHOSTTY_SHADERS_DENSITY=0.6  # sparse 留白 ‹1› lush (fill)   (0.3 … 1.8)
+GHOSTTY_SHADERS_GLOW=1.8     # crisp ‹1› dreamy (bloom)     (0.6 … 2.5)
+ghostty-shaders use jiang-xue
+```
+
+The [live gallery](https://an0sunshy.github.io/ghostty-shaders/) exposes the
+same four as live sliders for any poem.
 
 ### Weather → scene mapping
 
@@ -139,7 +186,7 @@ single time and cached in `location.json`; subsequent polls reuse it.
 phase is computed at swap time from the synodic cycle (29.53 days) and baked
 into the shader as `#define MOON_PHASE` (∈ `[0,1)`: `0` new, `0.25` first
 quarter, `0.5` full, `0.75` last quarter). Preview the whole cycle with
-`ghostty-weather-moon-demo`.
+`ghostty-shaders moon-demo`.
 
 ## Technical notes
 
@@ -194,8 +241,8 @@ scheduler.
 ./install.sh --uninstall     # removes symlinks, the include, and the LaunchAgent
 ```
 
-Runtime state under `~/.config/ghostty-weather/` and
-`~/Library/Caches/ghostty-weather/` is left intact; delete it manually if you
+Runtime state under `~/.config/ghostty-shaders/` and
+`~/Library/Caches/ghostty-shaders/` is left intact; delete it manually if you
 want a clean slate.
 
 ## Contributing & quality
@@ -224,12 +271,13 @@ MIT — see [LICENSE](LICENSE).
 ## Layout
 
 ```text
-bin/          the five ghostty-weather-* commands (swap, poll, toggle, demos)
-shaders/      the six scene shaders (.glsl) + portable GLSL helpers
+bin/          the single `ghostty-shaders` dispatcher (the only command on PATH)
+libexec/      subcommand implementations (apply, weather, toggle, demos)
+shaders/      scene shaders by collection (weather/, poems/) + portable GLSL helpers
 web/          the WebGL2 scene gallery (the GitHub Pages demo)
 bench/        headless GPU timing + golden-image harness (the compute gate)
-scripts/      gallery site build / serve + asset capture
-tests/        unit tests for the decision logic (CI: ubuntu)
+scripts/      scene discovery + process helpers, gallery build / serve, asset capture
+tests/        unit tests for the decision logic + install migration (CI: ubuntu)
 docs/         scene authoring, shader portability, performance, review panel
 ```
 

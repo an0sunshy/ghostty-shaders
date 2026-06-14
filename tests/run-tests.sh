@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# run-tests.sh — unit tests for the pure decision logic in bin/.
+# run-tests.sh — unit tests for the pure decision logic in
+# libexec/ghostty-shaders/.
 #
 # No framework, no dependencies: the scripts under test return early when
 # sourced (see the sourced-return guard in each), so this harness sources
@@ -44,9 +45,9 @@ t_close() {  # t_close <description> <expected> <actual> <abs-tolerance>
 # Their `set -e` would abort this harness on the first failed assertion;
 # turn it back off.
 # shellcheck disable=SC1091
-source "$REPO_ROOT/bin/ghostty-weather-poll"
+source "$REPO_ROOT/libexec/ghostty-shaders/weather"
 # shellcheck disable=SC1091
-source "$REPO_ROOT/bin/ghostty-weather-swap"
+source "$REPO_ROOT/libexec/ghostty-shaders/apply"
 set +e +o pipefail
 
 # --- pick_scene: the full WMO mapping table from the README ------------------
@@ -199,20 +200,22 @@ t "seconds_since_midnight 23:59:59" "86399" "$(seconds_since_midnight 23 59 59)"
 
 # --- web gallery registry ------------------------------------------------------
 # The gallery derives its scene list from index.html's picker buttons; a
-# scene shipped in shaders/scenes/ but missing a button would silently
-# never appear on the Pages demo (and vice versa for a deleted scene).
+# scene shipped under shaders/ but missing a button would silently never
+# appear on the Pages demo (and vice versa for a deleted scene). scene_names
+# is the same discovery the apply/build/bench use (sourced via the apply module).
 
-fs_scenes="$(cd "$REPO_ROOT/shaders/scenes" && for f in *.glsl; do printf '%s ' "${f%.glsl}"; done)"
+fs_scenes="$(scene_names "$REPO_ROOT/shaders" | tr '\n' ' ')"
 html_scenes="$(grep -oE 'data-scene="[^"]+"' "$REPO_ROOT/web/index.html" | sed -E 's/.*"([^"]+)"/\1/' | sort | tr '\n' ' ')"
 t "web gallery picker offers exactly the shipped scenes" "$fs_scenes" "$html_scenes"
 
 # --- ghostty_pids_from_ps: the Ghostty process matcher -------------------------
 # Regression for the macOS bug where `pgrep -x ghostty` matched nothing for a
 # .app-bundle launch (comm is the full exec path, which pgrep truncates to 16
-# chars), so swap/toggle silently never signalled Ghostty to reload. swap and
-# toggle now parse `ps -o pid=,comm=` and match the exact comm basename. Pin
-# that: a full path matches, a bare `ghostty` matches, spaces in the path are
-# tolerated, and the match is EXACT so the `ghostty-weather-*` helpers and a
+# chars), so apply/toggle silently never signalled Ghostty to reload. They now
+# parse `ps -o pid=,comm=` and match the exact comm basename, via the shared
+# scripts/ghostty-process.sh (sourced here through the apply module). Pin that:
+# a full path matches, a bare `ghostty` matches, spaces in the path are
+# tolerated, and the match is EXACT so the `ghostty-shaders` helper and a
 # `notghostty` binary are excluded (a substring match would catch them).
 #
 # CRITICAL: real `ps -axo pid=,comm=` RIGHT-JUSTIFIES the pid column, so every
@@ -226,8 +229,8 @@ t "ghostty_pids_from_ps padded bare comm 'ghostty' -> pid" "2000" \
   "$(printf '%s\n' '  2000 ghostty' | ghostty_pids_from_ps)"
 t "ghostty_pids_from_ps tolerates spaces in path" "5000" \
   "$(printf '%s\n' '  5000 /Apps/My Stuff/ghostty' | ghostty_pids_from_ps)"
-t "ghostty_pids_from_ps excludes ghostty-weather-* helper" "" \
-  "$(printf '%s\n' '  3000 /Users/me/.local/bin/ghostty-weather-poll' | ghostty_pids_from_ps)"
+t "ghostty_pids_from_ps excludes the ghostty-shaders helper" "" \
+  "$(printf '%s\n' '  3000 /Users/me/.local/bin/ghostty-shaders' | ghostty_pids_from_ps)"
 t "ghostty_pids_from_ps is exact, not substring (notghostty)" "" \
   "$(printf '%s\n' '  6000 /usr/bin/notghostty' | ghostty_pids_from_ps)"
 t "ghostty_pids_from_ps also matches an unpadded line" "7000" \
@@ -238,31 +241,29 @@ t "ghostty_pids_from_ps filters a mixed ps table" "1306
 2000" "$(printf '%s\n' \
   ' 1306 /Applications/Ghostty.app/Contents/MacOS/ghostty' \
   '  2000 ghostty' \
-  '  3000 /usr/bin/ghostty-weather-poll' \
+  '  3000 /usr/bin/ghostty-shaders' \
   '  4000 bash' | ghostty_pids_from_ps)"
 
-# The matcher is intentionally copied into both swap and toggle (standalone
-# executables, no shared lib). Only swap's copy is exercised above (the test
-# sources swap); toggle's runs only as a subprocess. Pin the copies identical
-# so a fix to one can't silently skip the other.
-matcher_of() { awk '/^ghostty_pids_from_ps\(\) \{/,/^}/' "$1"; }
-t "ghostty_pids_from_ps is identical in swap and toggle" \
-  "$(matcher_of "$REPO_ROOT/bin/ghostty-weather-swap")" \
-  "$(matcher_of "$REPO_ROOT/bin/ghostty-weather-toggle")"
+# The matcher now lives in exactly one place (scripts/ghostty-process.sh), so
+# it cannot drift between apply and toggle. Pin that both subcommands actually
+# source it — a copy-paste regression would reintroduce the macOS bug above.
+sources_matcher() { grep -qF 'scripts/ghostty-process.sh' "$1" && echo yes || echo no; }
+t "apply sources the shared process matcher"  "yes" "$(sources_matcher "$REPO_ROOT/libexec/ghostty-shaders/apply")"
+t "toggle sources the shared process matcher" "yes" "$(sources_matcher "$REPO_ROOT/libexec/ghostty-shaders/toggle")"
 
 # --- toggle lifecycle ----------------------------------------------------------
 # Regression for the `set -e` abort that left active.conf shaderless while the
 # pause marker was never written, so --status wrongly reported "active". Drive
-# the real toggle as a subprocess against a throwaway HOME (all its state lives
-# under $HOME). A stub `ps` on PATH makes the matcher find no Ghostty — that is
-# the exact path that used to abort do_pause, and it stops the test from
-# signalling a real Ghostty that may be running on the dev machine.
+# the real `ghostty-shaders` dispatcher as a subprocess against a throwaway HOME
+# (all its state lives under $HOME), exercising the full router→libexec path. A
+# stub `ps` on PATH makes the matcher find no Ghostty — that is the exact path
+# that used to abort do_pause, and it stops the test from signalling a real
+# Ghostty that may be running on the dev machine.
 
-TGL="$REPO_ROOT/bin/ghostty-weather-toggle"
-SWP="$REPO_ROOT/bin/ghostty-weather-swap"
+GS="$REPO_ROOT/bin/ghostty-shaders"
 TT_HOME="$(mktemp -d)"
-ACT="$TT_HOME/.config/ghostty-weather/active.conf"
-MRK="$TT_HOME/Library/Caches/ghostty-weather/paused"
+ACT="$TT_HOME/.config/ghostty-shaders/active.conf"
+MRK="$TT_HOME/Library/Caches/ghostty-shaders/paused"
 STUB="$TT_HOME/stubbin"
 mkdir -p "$STUB"
 printf '#!/bin/sh\nexit 0\n' > "$STUB/ps"   # pretend no Ghostty is running
@@ -272,27 +273,151 @@ run_tt()    { HOME="$TT_HOME" PATH="$STUB:$PATH" "$@"; }
 has_shader() { if grep -q '^custom-shader' "$ACT" 2>/dev/null; then echo shader; else echo none; fi; }
 has_marker() { if [[ -f $MRK ]]; then echo yes; else echo no; fi; }
 
-run_tt "$SWP" clear-night >/dev/null 2>&1
-t "lifecycle: swap seeds an active shader include" "shader" "$(has_shader)"
+run_tt "$GS" apply clear-night >/dev/null 2>&1
+t "lifecycle: apply seeds an active shader include" "shader" "$(has_shader)"
 t "lifecycle: active state has no pause marker"     "no"     "$(has_marker)"
-t "lifecycle: --status reports active"              "active" "$(run_tt "$TGL" --status | head -n 1)"
+t "lifecycle: toggle --status reports active"       "active" "$(run_tt "$GS" toggle --status | head -n 1)"
 
-run_tt "$TGL" --pause >/dev/null
+run_tt "$GS" toggle --pause >/dev/null
 t "lifecycle: --pause writes the pause marker"      "yes"    "$(has_marker)"
 t "lifecycle: --pause leaves a shaderless include"  "none"   "$(has_shader)"
-t "lifecycle: --status reports paused"              "paused" "$(run_tt "$TGL" --status | head -n 1)"
+t "lifecycle: toggle --status reports paused"       "paused" "$(run_tt "$GS" toggle --status | head -n 1)"
 
-run_tt "$TGL" --pause >/dev/null
+run_tt "$GS" toggle --pause >/dev/null
 t "lifecycle: --pause is idempotent (still paused)" "yes"    "$(has_marker)"
 
-run_tt "$TGL" --resume >/dev/null 2>&1
+run_tt "$GS" toggle --resume >/dev/null 2>&1
 t "lifecycle: --resume clears the pause marker"     "no"     "$(has_marker)"
 t "lifecycle: --resume restores a shader include"   "shader" "$(has_shader)"
 
-run_tt "$TGL" >/dev/null
+run_tt "$GS" toggle >/dev/null
 t "lifecycle: bare toggle from active pauses"       "yes"    "$(has_marker)"
 
 [[ -n ${TT_HOME:-} && -d $TT_HOME ]] && rm -rf "$TT_HOME"
+
+# --- install.sh migration (ghostty-weather → ghostty-shaders) -------------------
+# Regression for the data-loss bug where cmd_install pre-created the new config
+# dir before migrate ran, so the move was skipped and the user's location was
+# replaced by a blank seeded config. Drive the real install.sh against a
+# throwaway HOME seeded with a pre-rename install, with launchctl/ps stubbed so
+# nothing touches the real machine. Linux-portable (uses the Linux Ghostty
+# config path; mv/sed/grep only).
+
+MIG_HOME="$(mktemp -d)"
+mkdir -p "$MIG_HOME/.config/ghostty-weather" \
+         "$MIG_HOME/Library/Caches/ghostty-weather" \
+         "$MIG_HOME/Library/Logs" "$MIG_HOME/Library/LaunchAgents" \
+         "$MIG_HOME/.local/bin" "$MIG_HOME/stubbin"
+# Compute the Ghostty config path exactly as install.sh does, and pin
+# XDG_CONFIG_HOME under the sandbox so the Linux branch can't escape it.
+case "$(uname -s)" in
+    Darwin) MIG_GCONF="$MIG_HOME/Library/Application Support/com.mitchellh.ghostty/config" ;;
+    *)      MIG_GCONF="$MIG_HOME/.config/ghostty/config" ;;
+esac
+mkdir -p "$(dirname "$MIG_GCONF")"
+MIG_ROT="$MIG_HOME/Library/Caches/ghostty-weather/weather-1781299360-52083.glsl"
+printf '// rotated scene\n' > "$MIG_ROT"
+cat > "$MIG_HOME/.config/ghostty-weather/active.conf" <<EOF
+# Generated by ghostty-weather-swap; do not edit by hand.
+# Active scenario: clear-day  (2026-06-12T00:00:00Z)
+custom-shader = $MIG_ROT
+EOF
+printf 'LAT=47.6062\nLON=-122.3321\n' > "$MIG_HOME/.config/ghostty-weather/config.env"
+printf '{"lat":47.6,"lon":-122.3,"city":"Seattle"}\n' > "$MIG_HOME/.config/ghostty-weather/location.json"
+printf 'old log\n' > "$MIG_HOME/Library/Logs/ghostty-weather-poll.log"
+printf '<plist/>\n' > "$MIG_HOME/Library/LaunchAgents/dev.ghostty-weather.poll.plist"
+cat > "$MIG_GCONF" <<EOF
+font-family = "Berkeley Mono"
+
+# ghostty-weather (managed by ~/dev/ghostty-weather)
+config-file = ?$MIG_HOME/.config/ghostty-weather/active.conf
+EOF
+ln -sf /dev/null "$MIG_HOME/.local/bin/ghostty-weather-swap"
+printf '#!/bin/sh\nexit 0\n' > "$MIG_HOME/stubbin/launchctl"; chmod +x "$MIG_HOME/stubbin/launchctl"
+printf '#!/bin/sh\nexit 0\n' > "$MIG_HOME/stubbin/ps"; chmod +x "$MIG_HOME/stubbin/ps"
+
+run_mig() { HOME="$MIG_HOME" XDG_CONFIG_HOME="$MIG_HOME/.config" PATH="$MIG_HOME/stubbin:$PATH" bash "$REPO_ROOT/install.sh" >/dev/null 2>&1; }
+run_mig
+
+t "migrate: new config dir created"         "yes" "$([[ -d $MIG_HOME/.config/ghostty-shaders ]] && echo yes || echo no)"
+t "migrate: old config dir moved away"      "yes" "$([[ ! -d $MIG_HOME/.config/ghostty-weather ]] && echo yes || echo no)"
+t "migrate: user location config preserved" "47.6062" "$(read_env_var LAT "$MIG_HOME/.config/ghostty-shaders/config.env")"
+t "migrate: location.json preserved"        "yes" "$([[ -f $MIG_HOME/.config/ghostty-shaders/location.json ]] && echo yes || echo no)"
+t "migrate: rotated scene file moved"       "yes" "$([[ -f $MIG_HOME/Library/Caches/ghostty-shaders/weather-1781299360-52083.glsl ]] && echo yes || echo no)"
+t "migrate: active.conf repointed to new cache" "yes" \
+  "$(grep -q 'Caches/ghostty-shaders' "$MIG_HOME/.config/ghostty-shaders/active.conf" && ! grep -q 'Caches/ghostty-weather' "$MIG_HOME/.config/ghostty-shaders/active.conf" && echo yes || echo no)"
+t "migrate: log renamed"                    "yes" "$([[ -f $MIG_HOME/Library/Logs/ghostty-shaders-poll.log && ! -f $MIG_HOME/Library/Logs/ghostty-weather-poll.log ]] && echo yes || echo no)"
+t "migrate: old plist removed"              "yes" "$([[ ! -f $MIG_HOME/Library/LaunchAgents/dev.ghostty-weather.poll.plist ]] && echo yes || echo no)"
+t "migrate: ghostty include rewritten"      "yes" \
+  "$(grep -qF "ghostty-shaders/active.conf" "$MIG_GCONF" && ! grep -qF "ghostty-weather/active.conf" "$MIG_GCONF" && echo yes || echo no)"
+t "migrate: unrelated ghostty config kept"  "yes" "$(grep -qF 'Berkeley Mono' "$MIG_GCONF" && echo yes || echo no)"
+t "migrate: single new symlink present"     "yes" "$([[ -L $MIG_HOME/.local/bin/ghostty-shaders ]] && echo yes || echo no)"
+t "migrate: legacy symlink removed"         "yes" "$([[ ! -e $MIG_HOME/.local/bin/ghostty-weather-swap ]] && echo yes || echo no)"
+
+# Idempotent: a second run must not duplicate the include or error.
+run_mig
+t "migrate: re-run keeps include un-duplicated" "1" "$(grep -cF 'ghostty-shaders/active.conf' "$MIG_GCONF")"
+
+[[ -n ${MIG_HOME:-} && -d $MIG_HOME ]] && rm -rf "$MIG_HOME"
+
+# --- static selection (use / random) + collections -----------------------------
+# `use`/`random` pin a scene so the cron weather poller stands down; a manual
+# `weather` clears the pin. Drive the real dispatcher against a throwaway HOME
+# with ps/curl/launchctl stubbed (no real machine state, no network).
+
+SEL_HOME="$(mktemp -d)"; mkdir -p "$SEL_HOME/stubbin"
+printf '#!/bin/sh\nexit 0\n' > "$SEL_HOME/stubbin/ps";        chmod +x "$SEL_HOME/stubbin/ps"
+printf '#!/bin/sh\nexit 0\n' > "$SEL_HOME/stubbin/launchctl"; chmod +x "$SEL_HOME/stubbin/launchctl"
+printf '#!/bin/sh\nexit 1\n' > "$SEL_HOME/stubbin/curl";      chmod +x "$SEL_HOME/stubbin/curl"
+SEL_FILE="$SEL_HOME/.config/ghostty-shaders/selection"
+SEL_ACT="$SEL_HOME/.config/ghostty-shaders/active.conf"
+run_sel() { HOME="$SEL_HOME" PATH="$SEL_HOME/stubbin:$PATH" "$GS" "$@"; }
+
+t "list names both collections" "weather poems" \
+  "$(run_sel list 2>/dev/null | grep -oE '^  (weather|poems)' | awk '{print $1}' | sort -r | tr '\n' ' ' | sed 's/ $//')"
+t "list <collection> emits that collection's scenes" "6" \
+  "$(run_sel list weather 2>/dev/null | grep -c .)"
+
+run_sel use rain >/dev/null 2>&1
+t "use pins the scene"                "rain"   "$(cat "$SEL_FILE" 2>/dev/null)"
+t "use applies the scene"             "shader" "$(grep -q '^custom-shader' "$SEL_ACT" 2>/dev/null && echo shader || echo none)"
+run_sel use not-a-real-scene >/dev/null 2>&1
+t "use rejects an unknown scene (rc)" "1"      "$?"
+t "use rejection leaves prior pin"    "rain"   "$(cat "$SEL_FILE" 2>/dev/null)"
+
+run_sel random weather >/dev/null 2>&1
+sel_pick="$(cat "$SEL_FILE" 2>/dev/null)"
+t "random <collection> pins a scene from it" "yes" \
+  "$(scene_path "$REPO_ROOT/shaders/weather" "$sel_pick" >/dev/null 2>&1 && echo yes || echo no)"
+
+# Cron poller must NOT clobber a static pin: with the marker set, --cron skips
+# without touching active.conf.
+printf 'jing-ye-si\n' > "$SEL_FILE"
+rm -f "$SEL_ACT"
+HOME="$SEL_HOME" PATH="$SEL_HOME/stubbin:$PATH" "$REPO_ROOT/libexec/ghostty-shaders/weather" --cron >/dev/null 2>&1
+t "cron poll stands down under a static pin" "jing-ye-si" "$(cat "$SEL_FILE" 2>/dev/null)"
+t "cron poll wrote no active include"        "none"       "$([[ -f $SEL_ACT ]] && echo some || echo none)"
+
+# A manual `weather` is an explicit return to weather mode: it clears the pin.
+HOME="$SEL_HOME" PATH="$SEL_HOME/stubbin:$PATH" "$REPO_ROOT/libexec/ghostty-shaders/weather" >/dev/null 2>&1
+t "manual weather clears the static pin" "gone" "$([[ -f $SEL_FILE ]] && echo present || echo gone)"
+
+[[ -n ${SEL_HOME:-} && -d $SEL_HOME ]] && rm -rf "$SEL_HOME"
+
+# --- poem display titles (collections/poems.titles) ----------------------------
+# Every poems/ scene must have an English title row, and the gallery's poem-button
+# `title=` tooltips must match that file — so the CLI (`list poems`) and the demo
+# can't drift from each other.
+
+pt_file="$REPO_ROOT/collections/poems.titles"
+pt_names="$(awk -F'|' '!/^#/ && NF==3 {print $1}' "$pt_file" | sort | tr '\n' ' ')"
+fs_poems="$(scene_names "$REPO_ROOT/shaders/poems" | tr '\n' ' ')"
+t "every poem scene has a poems.titles row" "$fs_poems" "$pt_names"
+
+pt_expected="$(awk -F'|' '!/^#/ && NF==3 {print $1 "\t" $2 " — " $3}' "$pt_file" | sort)"
+html_titles="$(grep -oE 'data-scene="[^"]+"[[:space:]]+title="[^"]+"' "$REPO_ROOT/web/index.html" \
+  | sed -E 's/data-scene="([^"]+)"[[:space:]]+title="([^"]+)"/\1\t\2/' | sort)"
+t "gallery poem tooltips match poems.titles" "$pt_expected" "$html_titles"
 
 # --- summary -------------------------------------------------------------------
 

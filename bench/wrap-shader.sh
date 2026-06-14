@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # wrap-shader.sh — emit a complete, stand-alone GLSL fragment shader for a
-# ghostty-weather scene, to stdout.
+# ghostty-shaders scene, to stdout.
 #
 # Scenes are Shadertoy-style bodies (mainImage + helpers, no #version, no
 # uniform declarations); each HOST supplies a small preamble/epilogue and
@@ -8,8 +8,8 @@
 # so a syntax checker such as glslangValidator (Linux CI) can validate the
 # exact text each host compiles, without the host or a GPU:
 #
-#   bench/wrap-shader.sh shaders/scenes/cloudy.glsl                 > out.frag
-#   bench/wrap-shader.sh --profile es300 shaders/scenes/cloudy.glsl > out.frag
+#   bench/wrap-shader.sh shaders/weather/cloudy.glsl                 > out.frag
+#   bench/wrap-shader.sh --profile es300 shaders/weather/cloudy.glsl > out.frag
 #   glslangValidator out.frag
 #
 # Profiles:
@@ -24,7 +24,7 @@
 #
 # --defines additionally injects the three baked #defines (representative
 # non-default values) between preamble and scene, mirroring what BOTH real
-# hosts compile: ghostty-weather-swap prepends them for Ghostty and
+# hosts compile: ghostty-shaders apply prepends them for Ghostty and
 # web/gallery.js bakes them for the browser. Validating this variant catches
 # scenes that define a macro without an #ifndef guard — a redefinition error
 # live, invisible to the bare wrap. CI validates both variants.
@@ -37,7 +37,7 @@ usage() {
     echo "usage: $0 [--profile gl410|es300] [--defines] <scene.glsl>" >&2
 }
 
-# Mirror of the defines ghostty-weather-swap/gallery.js inject. Values are
+# Mirror of the defines ghostty-shaders apply/gallery.js inject. Values are
 # deliberately NOT the scenes' #ifndef fallbacks, so an unguarded #define in
 # a scene produces the same "macro redefined" error here as in production.
 emit_defines() {

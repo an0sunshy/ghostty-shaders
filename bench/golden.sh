@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# golden.sh — golden-image visual-regression harness for ghostty-weather scenes.
+# golden.sh — golden-image visual-regression harness for ghostty-shaders scenes.
 #
-# Renders each of the 6 scenes to a deterministic single-frame PNG (fixed iTime,
+# Renders each scene to a deterministic single-frame PNG (fixed iTime,
 # fixed small resolution, empty glyph layer) via the headless glsl_image harness,
 # and either records those PNGs as references (`update`) or compares the current
 # render against the committed references (`check`, the default).
@@ -12,9 +12,9 @@
 #                      fail if any drifts beyond the tolerance (default)
 #
 # Env:
-#   GHOSTTY_WEATHER_GOLDEN_TOLERANCE   mean abs per-channel RGB diff allowed,
+#   GHOSTTY_SHADERS_GOLDEN_TOLERANCE   mean abs per-channel RGB diff allowed,
 #                                       0-255 scale (default 2.0)
-#   GHOSTTY_WEATHER_GOLDEN_W / _H      render resolution (default 480 x 310)
+#   GHOSTTY_SHADERS_GOLDEN_W / _H      render resolution (default 480 x 310)
 #
 # CROSS-HARDWARE CAVEAT
 #   GPU floating-point is not bit-identical across vendors/drivers/OS versions,
@@ -24,7 +24,7 @@
 #   generous-but-meaningful to absorb that minor drift while still catching real
 #   regressions (a changed effect moves the score far past it). If a *different*
 #   runner (e.g. CI) legitimately exceeds tolerance with an unchanged shader,
-#   raise GHOSTTY_WEATHER_GOLDEN_TOLERANCE for that environment — the committed
+#   raise GHOSTTY_SHADERS_GOLDEN_TOLERANCE for that environment — the committed
 #   references are only ever regenerated on the maintainer's hardware (see
 #   docs/publishing.md), never from a CI runner's output.
 #
@@ -34,15 +34,17 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-SCENES_DIR="$SCRIPT_DIR/../shaders/scenes"
+SHADERS_DIR="$SCRIPT_DIR/../shaders"
+# shellcheck source=../scripts/scene-discovery.sh disable=SC1091
+. "$SCRIPT_DIR/../scripts/scene-discovery.sh"
 VENDOR_DIR="$SCRIPT_DIR/vendor"
 GOLDEN_DIR="$SCRIPT_DIR/golden"
 BIN="$SCRIPT_DIR/glsl_image"
 SRC="$SCRIPT_DIR/glsl_image.c"
 
-TOLERANCE="${GHOSTTY_WEATHER_GOLDEN_TOLERANCE:-2.0}"
-W="${GHOSTTY_WEATHER_GOLDEN_W:-480}"
-H="${GHOSTTY_WEATHER_GOLDEN_H:-310}"
+TOLERANCE="${GHOSTTY_SHADERS_GOLDEN_TOLERANCE:-2.0}"
+W="${GHOSTTY_SHADERS_GOLDEN_W:-480}"
+H="${GHOSTTY_SHADERS_GOLDEN_H:-310}"
 
 CMD="${1:-check}"
 case "$CMD" in
@@ -88,7 +90,7 @@ if [[ ! -x "$BIN" || "$SRC" -nt "$BIN" \
     clang -O2 -DGL_SILENCE_DEPRECATION "$SRC" -framework OpenGL -o "$BIN"
 fi
 
-SCENES=$(find "$SCENES_DIR" -maxdepth 1 -name '*.glsl' -exec basename {} .glsl \; | sort)
+SCENES=$(scene_names "$SHADERS_DIR")
 
 # --- update: (re)generate references ----------------------------------------
 if [[ "$CMD" == "update" ]]; then
@@ -96,7 +98,7 @@ if [[ "$CMD" == "update" ]]; then
     echo "rendering golden references at ${W}x${H} -> $GOLDEN_DIR"
     while IFS= read -r s; do
         [[ -n "$s" ]] || continue
-        "$BIN" "$SCENES_DIR/$s.glsl" --write "$GOLDEN_DIR/$s.png" "$W" "$H" >/dev/null
+        "$BIN" "$(scene_path "$SHADERS_DIR" "$s")" --write "$GOLDEN_DIR/$s.png" "$W" "$H" >/dev/null
         echo "  wrote $s.png"
     done <<< "$SCENES"
     echo "done. Commit bench/golden/*.png."
@@ -115,7 +117,7 @@ while IFS= read -r s; do
         missing=$((missing + 1))
         continue
     fi
-    out=$("$BIN" "$SCENES_DIR/$s.glsl" --compare "$ref" --tolerance "$TOLERANCE" 2>/dev/null) && verdict="ok" || verdict="DRIFT"
+    out=$("$BIN" "$(scene_path "$SHADERS_DIR" "$s")" --compare "$ref" --tolerance "$TOLERANCE" 2>/dev/null) && verdict="ok" || verdict="DRIFT"
     score=$(printf '%s\n' "$out" | sed -n 's/.*meanabsdiff=\([0-9.]*\).*/\1/p')
     printf "  %-14s score=%-10s %s\n" "$s" "${score:-?}" "$verdict"
     [[ "$verdict" == "ok" ]] || fail=$((fail + 1))

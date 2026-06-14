@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **CI now validates the defines-injected shader variant** that both real
   hosts actually compile (`wrap-shader.sh --defines`, mirroring what
-  `ghostty-weather-swap` and the gallery bake in). Previously only the
+  `ghostty-shaders apply` and the gallery bake in). Previously only the
   `#ifndef`-fallback text was validated, so a scene defining a macro
   without a guard would pass CI and fail live with "macro redefined".
   Tag pushes and manual dispatch now also trigger CI, so release refs
@@ -89,21 +89,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `#define MOON_PHASE` at swap time, covering all eight lunar phases.
   Includes limb darkening, procedural maria and highland speckle, earthshine
   on the dark hemisphere, and a symmetric halo that dims toward new moon.
-- **Pause/resume toggle** (`ghostty-weather-toggle`) for temporarily
+- **Pause/resume toggle** (`ghostty-shaders toggle`) for temporarily
   suspending weather-driven shader swaps without uninstalling the LaunchAgent.
-  Manual `ghostty-weather-swap` calls override the paused state and re-enable
+  Manual `ghostty-shaders apply` calls override the paused state and re-enable
   polling.
 - **Battery-aware automation** — optional `PAUSE_ON_BATTERY=true` in
   `config.env` pauses the shader on battery power and resumes on AC, checked
   at each poll via `pmset` (macOS only).
-- **`.env`-based location config** (`~/.config/ghostty-weather/config.env`):
+- **`.env`-based location config** (`~/.config/ghostty-shaders/config.env`):
   set `LAT`/`LON` directly (zero third-party calls) or `LOCATION` as a city
   name or US ZIP (geocoded once via Open-Meteo and cached in
-  `location.json`). Interactive setup: `ghostty-weather-poll --set-city`.
-- **Self-installing 15-minute LaunchAgent** — `ghostty-weather-poll --install`
+  `location.json`). Interactive setup: `ghostty-shaders weather set-city`.
+- **Self-installing 15-minute LaunchAgent** — `ghostty-shaders weather on`
   writes and loads a `launchd` plist under `~/Library/LaunchAgents/`;
-  `--uninstall` removes it cleanly.
-- **Compile-failure auto-revert** — `ghostty-weather-swap` reads Ghostty's
+  `ghostty-shaders weather off` removes it cleanly.
+- **Compile-failure auto-revert** — `ghostty-shaders apply` reads Ghostty's
   unified log after signaling; if the new shader fails to compile it restores
   the previous shader file and re-signals, so a bad scene never leaves the
   terminal shaderless.
@@ -113,8 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gates every scene at a configurable budget percentage (default **5%** of
   the 8.33 ms / 120 Hz frame budget). Scenes that exceed the threshold fail
   the build; the benchmark is the oracle for all future performance changes.
-- `ghostty-weather-demo` command to cycle all six scenes for visual review.
-- `ghostty-weather-moon-demo` command to cycle `clear-night` through all
+- `ghostty-shaders demo` command to cycle all six scenes for visual review.
+- `ghostty-shaders moon-demo` command to cycle `clear-night` through all
   eight synthesized lunar phases.
 
 ### Changed
@@ -135,9 +135,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scales with the illuminated fraction (symmetric ring) rather than gating on
   the lit side direction, which previously flipped visibly through the synodic
   cycle.
-- `ghostty-weather-swap` resolves its own real path via portable `readlink`
+- `ghostty-shaders apply` resolves its own real path via portable `readlink`
   before locating bundled scene files, so the command works correctly when
   invoked through the `~/.local/bin` symlink.
 
-[Unreleased]: https://github.com/an0sunshy/ghostty-weather/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/an0sunshy/ghostty-weather/releases/tag/v0.1.0
+[Unreleased]: https://github.com/an0sunshy/ghostty-shaders/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/an0sunshy/ghostty-shaders/releases/tag/v0.1.0

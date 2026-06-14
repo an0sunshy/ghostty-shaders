@@ -2,7 +2,7 @@
 // is a small soft circle that gently sways as it falls. Background-only;
 // text passes through.
 //
-// IS_DAY (baked by ghostty-weather-swap from Open-Meteo's is_day, 1.0 day /
+// IS_DAY (baked by ghostty-shaders apply from Open-Meteo's is_day, 1.0 day /
 // 0.0 night) dims the flakes at night. Snow stays relatively visible after
 // dark (it reflects ambient light well), so the night factor is gentle.
 // Guarded so the scene compiles stand-alone (day look).

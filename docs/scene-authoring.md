@@ -1,7 +1,7 @@
 # Scene authoring guide
 
 This document covers everything you need to write a new weather scene for
-ghostty-weather: the shader contract Ghostty expects, the baked defines the
+ghostty-shaders: the shader contract Ghostty expects, the baked defines the
 swap pipeline injects, performance discipline, and the steps to finish a scene
 and get it merged.
 
@@ -180,20 +180,20 @@ that touches a shader.
 Apply the scene to a running Ghostty instance immediately:
 
 ```sh
-ghostty-weather-swap <name>
+ghostty-shaders apply <name>
 ```
 
 Cycle all scenes in sequence (10 seconds each by default):
 
 ```sh
-ghostty-weather-demo [seconds]
+ghostty-shaders demo [seconds]
 ```
 
 If your scene is `clear-night` or uses `MOON_PHASE`, preview all eight
 synthesized lunar phases:
 
 ```sh
-ghostty-weather-moon-demo [seconds]
+ghostty-shaders moon-demo [seconds]
 ```
 
 ---
@@ -206,8 +206,8 @@ WebGL2 gallery. CI rejects a scene that breaks either wrapper; check
 locally with:
 
 ```sh
-bench/wrap-shader.sh                 shaders/scenes/<name>.glsl > /tmp/s.frag
-bench/wrap-shader.sh --profile es300 shaders/scenes/<name>.glsl > /tmp/s-es.frag
+bench/wrap-shader.sh                 shaders/<category>/<name>.glsl > /tmp/s.frag
+bench/wrap-shader.sh --profile es300 shaders/<category>/<name>.glsl > /tmp/s-es.frag
 glslangValidator /tmp/s.frag /tmp/s-es.frag
 ```
 

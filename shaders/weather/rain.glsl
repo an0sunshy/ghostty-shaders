@@ -6,7 +6,7 @@
 // any moment. Color is neutral grey (not blue), contribution kept small
 // so the effect reads as a misty wash rather than discrete drops.
 //
-// IS_DAY (baked by ghostty-weather-swap from Open-Meteo's is_day, 1.0 day /
+// IS_DAY (baked by ghostty-shaders apply from Open-Meteo's is_day, 1.0 day /
 // 0.0 night) dims the streaks at night. Guarded so the scene compiles
 // stand-alone (day look).
 

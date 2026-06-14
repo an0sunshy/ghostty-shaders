@@ -5,7 +5,7 @@
 // Tuned subtle: clouds tint the bg toward light grey only inside the puffs,
 // the rest stays the user's Nightfox bg.
 //
-// IS_DAY (baked by ghostty-weather-swap from Open-Meteo's is_day, 1.0 day /
+// IS_DAY (baked by ghostty-shaders apply from Open-Meteo's is_day, 1.0 day /
 // 0.0 night) dims the cloud lighting at night so an overcast night still
 // reads as nighttime. Guarded so the scene compiles stand-alone (day look).
 

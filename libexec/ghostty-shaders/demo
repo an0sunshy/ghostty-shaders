@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# ghostty-shaders demo — cycle through the weather scenes for visual review.
+# Each scene displays for DURATION seconds (default 10) before applying the
+# next. Loops until Ctrl-C. (The `demo` subcommand; entry point is
+# bin/ghostty-shaders.)
+#
+# Usage:
+#   ghostty-shaders demo            # default 10s per scene
+#   ghostty-shaders demo 15         # 15s per scene
+
+set -euo pipefail
+
+# Resolve real dir, following symlinks (~/.local/bin install). Portable.
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+    DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [ "${SOURCE#/}" = "$SOURCE" ] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+APPLY="$SCRIPT_DIR/apply"
+DURATION="${1:-10}"
+
+# Cycle the weather collection — discovered, not hardcoded, so a new weather
+# scene shows up here automatically (same recursive lookup the rest use).
+# shellcheck source=../../scripts/scene-discovery.sh disable=SC1091
+. "$REPO_DIR/scripts/scene-discovery.sh"
+SCENES=()
+while IFS= read -r s; do SCENES+=("$s"); done < <(scene_names "$REPO_DIR/shaders/weather")
+
+if ! [[ "$DURATION" =~ ^[0-9]+$ ]]; then
+    echo "usage: ghostty-shaders demo [seconds-per-scene]" >&2
+    exit 1
+fi
+
+trap 'echo; echo "demo stopped."; exit 0' INT
+echo "demo: cycling ${#SCENES[@]} scenes, $DURATION s each. Ctrl-C to stop."
+while true; do
+    for scene in "${SCENES[@]}"; do
+        echo "  $(date +%T) → $scene"
+        "$APPLY" "$scene" >/dev/null
+        sleep "$DURATION"
+    done
+done

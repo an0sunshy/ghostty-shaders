@@ -5,7 +5,7 @@
 // secondary stutter. Flash intensity capped at 0.35 so it pulses the bg
 // without strobing the text away.
 //
-// IS_DAY (baked by ghostty-weather-swap from Open-Meteo's is_day, 1.0 day /
+// IS_DAY (baked by ghostty-shaders apply from Open-Meteo's is_day, 1.0 day /
 // 0.0 night) dims the rain + overcast base at night. Lightning is left at
 // full intensity — a bright strike against a darker night sky is exactly
 // the desired drama. Guarded so the scene compiles stand-alone (day look).
