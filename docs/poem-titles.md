@@ -27,7 +27,8 @@ records what was used and why.
 | lang-tao-sha | 浪淘沙·其七 | Waves Scouring the Sand, No. 7 | Cí by tune-name; no single standard. The Qiantang tidal-bore poem. |
 | yin-hu-shang | 飲湖上初晴後雨 | Drinking on the Lake, First Clear Then Rain | No single standard; the West Lake poem. |
 | chun-xiao | 春曉 | Spring Dawn | Common short form; Bynner "A Spring Morning" ([Jade Mountain](https://en.wikisource.org/wiki/The_Jade_Mountain/A_Spring_Morning)). |
-| shan-xing | 山行 | Mountain Travel | No single standard; most common rendering. || qian-tang-hu-chun-xing | 錢塘湖春行 | Spring Stroll by Qiantang Lake | No single standard (Qiantang Lake = West Lake). |
+| shan-xing | 山行 | Mountain Travel | No single standard; most common rendering. |
+| qian-tang-hu-chun-xing | 錢塘湖春行 | Spring Stroll by Qiantang Lake | No single standard (Qiantang Lake = West Lake). |
 | feng-qiao-ye-bo | 楓橋夜泊 | Night Mooring at Maple Bridge | Bynner "A Night-Mooring near Maple Bridge" ([Jade Mountain](https://en.wikisource.org/wiki/The_Jade_Mountain/A_Night-Mooring_near_Maple_Bridge)). |
 | shi-zhi-sai-shang | 使至塞上 | On a Mission to the Frontier | Xu Yuanchong "On Mission to the Frontier". |
 | deng-guanque-lou | 登鸛雀樓 | Climbing Stork Tower | [Wikipedia](https://en.wikipedia.org/wiki/Wang_Zhihuan); Bynner "At Heron Lodge", Xu "On the Stork Tower". |
@@ -35,10 +36,12 @@ records what was used and why.
 | tianjingsha-qiusi | 天淨沙·秋思 | Autumn Thoughts (Tune: Sky-Clear Sand) | [Wikipedia](https://en.wikipedia.org/wiki/Ma_Zhiyuan) "Autumn Thoughts"; 天淨沙 is the qupai. |
 | xiao-chi | 小池 | Small Pond | No single standard. |
 | wang-tianmen-shan | 望天門山 | Gazing at Heaven's Gate Mountains | Xu Yuanchong "Mount Heaven's Gate Viewed from Afar". |
-| mu-jiang-yin | 暮江吟 | Song of the River at Dusk | No single standard. || chibi-huai-gu | 念奴嬌·赤壁懷古 | Charms of Niannu: Meditation on Red Cliff | Cí by tune-name; academic "The Charm of Niannu: Meditation on the Past at Red Cliff"; Xu "Charm of a Maiden Singer". Recognizable element: Red Cliff. |
+| mu-jiang-yin | 暮江吟 | Song of the River at Dusk | No single standard. |
+| chibi-huai-gu | 念奴嬌·赤壁懷古 | Charms of Niannu: Meditation on Red Cliff | Cí by tune-name; academic "The Charm of Niannu: Meditation on the Past at Red Cliff"; Xu "Charm of a Maiden Singer". Recognizable element: Red Cliff. |
 | zao-fa-baidi | 早發白帝城 | Leaving Baidi at Dawn | Concise; Xu Yuanchong "Leaving the White Emperor Town for Jiangling" (also 下江陵). |
 | qiu-xi | 秋夕 | Autumn Night | Short form of Bynner "In the Autumn Night" ([Jade Mountain](https://en.wikisource.org/wiki/The_Jade_Mountain/In_the_Autumn_Night)). |
-| du-zuo-jingting | 獨坐敬亭山 | Sitting Alone by Jingting Mountain | No single standard; also widely "Alone Looking at the Mountain", Xu "Sitting Alone in Face of Peak Jingting". || guan-canghai | 觀滄海 | Gazing at the Vast Sea | No single standard; also "Viewing the Ocean", "The Sea". A section of 步出夏門行. |
+| du-zuo-jingting | 獨坐敬亭山 | Sitting Alone by Jingting Mountain | No single standard; also widely "Alone Looking at the Mountain", Xu "Sitting Alone in Face of Peak Jingting". |
+| guan-canghai | 觀滄海 | Gazing at the Vast Sea | No single standard; also "Viewing the Ocean", "The Sea". A section of 步出夏門行. |
 | teng-wang-ge | 滕王閣序 | Preface to the Pavilion of Prince Teng | [Wikipedia](https://en.wikipedia.org/wiki/Tengwang_Ge_Xu). A parallel-prose preface, not a poem. |
 | ci-beigu | 次北固山下 | Mooring Below Beigu Mountain | Bynner "A Mooring under North Fort Hill" ([Jade Mountain](https://en.wikisource.org/wiki/The_Jade_Mountain/A_Mooring_under_North_Fort_Hill)). |
 

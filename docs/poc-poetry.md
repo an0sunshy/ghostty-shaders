@@ -1,6 +1,6 @@
 # POC: 唐诗 / 宋词 意境 — animated poem backgrounds
 
-**Status: POC for the shipped `poems` collection — 37 scenes built, 32 kept after curation.**
+**Status: POC for the shipped `poems` collection — 37 scenes built, 28 kept after curation.**
 28 animated GLSL terminal backgrounds (of 37 built), each evoking the 意境 of one famous
 classical Chinese poem. Built and refined by multi-agent orchestration — curation rounds
 (curators by thematic lens → synthesis), parallel build rounds (one agent per poem: write +
@@ -33,18 +33,23 @@ jian-jia (35), yanmen-taishou (36)._
 | 9 | `lang-tao-sha` | 浪淘沙·其七 | 劉禹錫 | 八月濤聲吼地來，捲起沙堆似雪堆。 | A massive foam-crest line advances fast across the frame, rears and peaks, then recedes — a surge-and-retreat loop; spray particles fling off the… |
 | 10 | `yin-hu-shang` | 飲湖上初晴後雨 | 蘇軾 | 水光潋灩晴方好，山色空濛雨亦奇。 | Traveling micro-highlights ripple across the lake (animated specular sparkle following a ripple field); a curtain of fine rain drifts diagonally; the… |
 | 11 | `chun-xiao` | 春曉 | 孟浩然 | 夜來風雨聲，花落知多少。 | Individual petals detach and fall on gentle sinusoidal sway paths (the storm already past, so the descent is soft and residual); each fades in at the… |
-| 12 | `shan-xing` | 山行 | 杜牧 | 停車坐愛楓林晚，霜葉紅於二月花。 | Maple-leaf glyphs spin and tumble as they fall — rotating, catching gusts, fluttering on a slightly chaotic diagonal descent (heavier, more tumbling… || 14 | `qian-tang-hu-chun-xing` | 錢塘湖春行 | 白居易 | 幾處早鶯爭暖樹，誰家新燕啄春泥。 | 2-3 swallow glyphs trace fast curved bezier swoop arcs across a wide dark field, dipping toward a faint lower water line and rising again — quick… |
+| 12 | `shan-xing` | 山行 | 杜牧 | 停車坐愛楓林晚，霜葉紅於二月花。 | Maple-leaf glyphs spin and tumble as they fall — rotating, catching gusts, fluttering on a slightly chaotic diagonal descent (heavier, more tumbling… |
+| 14 | `qian-tang-hu-chun-xing` | 錢塘湖春行 | 白居易 | 幾處早鶯爭暖樹，誰家新燕啄春泥。 | 2-3 swallow glyphs trace fast curved bezier swoop arcs across a wide dark field, dipping toward a faint lower water line and rising again — quick… |
 | 15 | `feng-qiao-ye-bo` | 楓橋夜泊 | 張繼 | 月落烏啼霜滿天，江楓漁火對愁眠。 | Two or three warm fishing-fire points flicker and sway gently; each casts a vertical wavering reflection that ripples and stretches on the rippling… |
 | 16 | `shi-zhi-sai-shang` | 使至塞上 | 王維 | 大漠孤煙直，長河落日圓。 | The beacon smoke drifts upward as a slow near-vertical luminous filament with a slight heat-haze wobble; the round sun sinks almost imperceptibly… |
-| 17 | `deng-guanque-lou` | 登鸛雀樓 | 王之渙 | 白日依山盡，黃河入海流。 | A broad ochre river-band flows steadily DIAGONALLY across the frame toward the far horizon (continuous downstream UV scroll with bright… || 19 | `yu-ge-zi` | 漁歌子 | 張志和 | 西塞山前白鷺飛，桃花流水鱖魚肥。 | TWO clear motions: a white egret GLIDES across the frame (a slow arc of wings), and peach petals DRIFT downstream on the current, rotating slightly… |
+| 17 | `deng-guanque-lou` | 登鸛雀樓 | 王之渙 | 白日依山盡，黃河入海流。 | A broad ochre river-band flows steadily DIAGONALLY across the frame toward the far horizon (continuous downstream UV scroll with bright… |
+| 19 | `yu-ge-zi` | 漁歌子 | 張志和 | 西塞山前白鷺飛，桃花流水鱖魚肥。 | TWO clear motions: a white egret GLIDES across the frame (a slow arc of wings), and peach petals DRIFT downstream on the current, rotating slightly… |
 | 20 | `tianjingsha-qiusi` | 天淨沙·秋思 | 馬致遠 | 古道西風瘦馬。夕陽西下，斷腸人在天涯。 | The setting sun SINKS toward the horizon while the lone horse-and-rider silhouette PLODS slowly across the empty plain (small, left-to-right), the… |
 | 21 | `xiao-chi` | 小池 | 楊萬里 | 小荷才露尖尖角，早有蜻蜓立上頭。 | The dragonfly HOVERS and then lands — darting in small quick movements before settling on the lotus tip, its wings shimmering; faint concentric… |
 | 22 | `wang-tianmen-shan` | 望天門山 | 李白 | 兩岸青山相對出，孤帆一片日邊來。 | Two facing cliff silhouettes slowly slide APART and grow (scaling/translating outward toward the frame edges) — the 相對出 illusion of peaks advancing… |
-| 23 | `mu-jiang-yin` | 暮江吟 | 白居易 | 一道殘陽鋪水中，半江瑟瑟半江紅。 | The shimmering, rippling light-band on the water is the mover — a horizontal swath of glints traveling and flickering across the surface (殘陽鋪水中),… || 25 | `chibi-huai-gu` | 念奴嬌·赤壁懷古 | 蘇軾 | 亂石穿空，驚濤拍岸，捲起千堆雪。 | Successive wave-crests sweep IN toward a fixed vertical cliff edge and SLAM, each collision detonating an upward burst of foam particles that arc up,… |
+| 23 | `mu-jiang-yin` | 暮江吟 | 白居易 | 一道殘陽鋪水中，半江瑟瑟半江紅。 | The shimmering, rippling light-band on the water is the mover — a horizontal swath of glints traveling and flickering across the surface (殘陽鋪水中),… |
+| 25 | `chibi-huai-gu` | 念奴嬌·赤壁懷古 | 蘇軾 | 亂石穿空，驚濤拍岸，捲起千堆雪。 | Successive wave-crests sweep IN toward a fixed vertical cliff edge and SLAM, each collision detonating an upward burst of foam particles that arc up,… |
 | 26 | `zao-fa-baidi` | 早發白帝城 | 李白 | 兩岸猿聲啼不住，輕舟已過萬重山。 | Layered gorge-wall silhouettes on the far left and far right edges SCROLL DOWNWARD-and-outward continuously (parallax: near walls fast, far walls… |
 | 27 | `qiu-xi` | 秋夕 | 杜牧 | 輕羅小扇撲流螢，天階夜色涼如水。 | The drifting, pulsing fireflies are the clear thing-in-motion — several soft glowing points wandering on slow looping paths, brightening and dimming… |
-| 28 | `du-zuo-jingting` | 獨坐敬亭山 | 李白 | 眾鳥高飛盡，孤雲獨去閒。 | A two-stage emptying: first a flock of small bird-marks rising diagonally and shrinking to vanishing (高飛盡), then a single lone cloud drifting… || 30 | `guan-canghai` | 觀滄海 | 曹操 | 秋風蕭瑟，洪波湧起。日月之行，若出其中。 | The ENTIRE sea-plane undulates — broad low-frequency swell-lines roll steadily across the frame from horizon toward the viewer, the surface rising… |
-| 31 | `teng-wang-ge` | 滕王閣序 | 王勃 | 落霞與孤鶩齊飛，秋水共長天一色。 | TWO motions moving in concert (齊飛): long soft rose-gold cloud-bands drift slowly and horizontally across the upper field, AND one lone duck glyph… || 37 | `ci-beigu` | 次北固山下 | 王灣 | 海日生殘夜，江春入舊年。鄉書何處達，歸雁洛陽邊。 | TWO motions: the red sun-disc RISES (生 — born from the sea), easing upward out of a horizontal water-glow at the bottom while the sky overhead… |
+| 28 | `du-zuo-jingting` | 獨坐敬亭山 | 李白 | 眾鳥高飛盡，孤雲獨去閒。 | A two-stage emptying: first a flock of small bird-marks rising diagonally and shrinking to vanishing (高飛盡), then a single lone cloud drifting… |
+| 30 | `guan-canghai` | 觀滄海 | 曹操 | 秋風蕭瑟，洪波湧起。日月之行，若出其中。 | The ENTIRE sea-plane undulates — broad low-frequency swell-lines roll steadily across the frame from horizon toward the viewer, the surface rising… |
+| 31 | `teng-wang-ge` | 滕王閣序 | 王勃 | 落霞與孤鶩齊飛，秋水共長天一色。 | TWO motions moving in concert (齊飛): long soft rose-gold cloud-bands drift slowly and horizontally across the upper field, AND one lone duck glyph… |
+| 37 | `ci-beigu` | 次北固山下 | 王灣 | 海日生殘夜，江春入舊年。鄉書何處達，歸雁洛陽邊。 | TWO motions: the red sun-disc RISES (生 — born from the sea), easing upward out of a horizontal water-glow at the bottom while the sky overhead… |
 
 ## Configurable compute (supersample dial)
 
