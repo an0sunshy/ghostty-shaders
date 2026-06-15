@@ -67,6 +67,83 @@ composite handles it.
 
 ---
 
+## Composition & motion craft
+
+The contract above gets a scene to compile and keep text legible. These three
+rules are what separate a scene that reads as intended from one that looks
+broken or muddy. They apply to every collection.
+
+### Render luminous fields, not figures
+
+The additive-on-dark style renders **fields and phenomena** — snow, fog,
+moonlight, rain, water, fire, smoke, cloud — beautifully, because each is just
+light scattered across many particles or a soft gradient. It renders
+**recognizable figure-objects** — a bird, a boat, a horse, a person, a lone
+sail — badly: a small hard silhouette over a luminous field reads as a sprite,
+not poetry, and no amount of detail fixes it.
+
+Before committing to an image, apply the test: **does the key image reduce to
+light / particle / field with no loss?** A firefly passes — it *is* a moving
+point of light. An egret or a wild-duck glyph fails — its meaning is its shape.
+If the poem's central image is a figure, do one of:
+
+- **寫意 (xiěyì) — render the trace, not the silhouette.** Show the figure's
+  effect on the field: the wake, not the boat; the disturbed water, not the
+  fish; the gust, not the bird.
+- **Pick a different line.** Most poems carry several images; choose the one
+  that is already a field — the sunset, the river, the snow — and let the
+  figure go.
+- Failing both, the scene doesn't belong in this style. Curate it out rather
+  than ship a sprite.
+
+This is a curation criterion, not a code check — there is no blocklist.
+Examples handled on these grounds: the boat in `zao-fa-baidi` and the egret in
+`yu-ge-zi` were curated out; the moored sail and homing goose were stripped
+from `ci-beigu`, and the lone sail from `wang-tianmen-shan`, in both cases
+keeping the field-scene (sunrise; cliffs-and-sun) that stood on its own.
+
+### Move natural effects in the physically correct direction
+
+A field only reads as itself if it moves the way the real phenomenon moves.
+Snow and rain **fall** — downward, with wind adding a diagonal, never upward;
+smoke and mist **rise**; water and current **flow downhill / downstream**; a
+setting sun **sinks**. A reversed or purely-sideways motion vector is the most
+common way these scenes look broken: the eye reads "snow", sees it drift up,
+and rejects the whole frame.
+
+Two checks when you write an advection term:
+
+1. **State the motion vector in a comment** (`// snow: down-and-left, ~27° off
+   vertical`) and confirm its sign against the top-left origin. High `uv.y` is
+   the top of the sky, so "falling" means the sampled field scrolls so that
+   features move toward *lower* `uv.y` over time — get the sign right.
+2. **Orient streaks along the travel axis.** Elongated snow/rain streaks must
+   lie *along* the direction of motion, not across it. A streak raked one way
+   while the field moves another reads as a glitch.
+
+`feng-xue-su` shipped with its snow rising up-and-left — the streaks were
+oriented correctly but advected against gravity, so the gale looked wrong. The
+fix was a single sign flip on the downwind axis plus matching the veil scroll.
+
+### Bias the focal element to the right
+
+This is a terminal background: the user's prompt, commands, and output are
+densest on the **left** and top-left and thin out toward the right, so the
+right side is the most "vacant" canvas. When a scene has a single focal
+element — a waterfall, the sun or moon, a lantern, a beacon — place it **right
+of center** (roughly the right third) so it sits where the text isn't, and keep
+the left two-thirds open. This composes with 留白: 留白 keeps the center
+vertically clear for legibility; the right-bias chooses *which* side the bright
+mass lives on.
+
+Broad, frameless fields — an even snowfall, a full-width sea swell, drifting
+fog — have no single focus and need no bias; spread them across the frame as
+the phenomenon would naturally fall. `wang-lushan-pubu` moves its whole
+cataract — column, spray, basin, haze — into the right third for exactly this
+reason.
+
+---
+
 ## Baked defines
 
 The swap pipeline prepends several `#define` lines to the scene before writing

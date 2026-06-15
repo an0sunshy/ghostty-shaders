@@ -4,29 +4,27 @@
 //   "The flocks of birds have flown high and vanished;
 //    a lone cloud drifts away, idle and free."
 //
-// A wide, emptying dusk sky over a single quiet mountain. The scene is a slow
-// TWO-PHASE "emptying to nothing", composited from back to front:
+// A wide, emptying dusk sky over a single quiet mountain. The birds have
+// already flown high and gone (眾鳥高飛盡); what remains is the lone cloud
+// drifting idly away. Composited from back to front:
 //   - a low, near-black flat MOUNTAIN MASS hugging the bottom edge (the still
 //     Jingting Shan the watcher faces); a faint dusk rim-glow sits just above
 //     its ridge so it reads as a silhouette against the fading light,
 //   - a pale graded DUSK GLOW kept to the TOP band and edges only — a vignette,
 //     never a full-frame wash; the CENTER (where terminal text sits) stays
 //     ~iBackgroundColor (留白),
-//   - Phase 1 高飛盡: a FLOCK of ~12 tiny luminous bird-marks streaming UPWARD
-//     and to the RIGHT, scaling and fading to nothing as they climb (toward the
-//     top of the frame as iTime grows),
-//   - Phase 2 孤雲獨去: after the birds are gone, ONE soft lone cloud drifts
-//     slowly LEFT-TO-RIGHT high in the sky and fades out, leaving the heavens
-//     bare,
-//   - then a long held STILLNESS — the 留白 that remains after everything
-//     departs — before the very slow loop begins again.
+//   - 孤雲獨去閒: ONE soft lone cloud, the scene's sole deliberate motion,
+//     drifting slowly and idly LEFT-TO-RIGHT high in the sky and easing out past
+//     the right edge — a slow, serene departure (獨去),
+//   - then a long held STILLNESS — the 留白 that remains after the cloud has
+//     gone — before the very slow loop begins again.
 //
 // Palette: muted dusk slate-violet #4a4660 → pale ash, near-black mountain
-//          mass #06070c, birds + cloud in soft luminous off-white #f4f8ff.
+//          mass #06070c, cloud in soft luminous off-white #f4f8ff.
 //
-// Direction note: glsl_image / Ghostty render UPRIGHT (uv.y = 1 at TOP). Birds
-// RISE, so they move toward the top as iTime increases — verified by frame
-// renders. The cloud drifts laterally left→right.
+// Direction note: glsl_image / Ghostty render UPRIGHT (uv.y = 1 at TOP). The
+// cloud drifts laterally left→right; it does NOT rise — clouds drift sideways,
+// they don't climb like smoke. Verified by frame renders.
 
 #ifndef GW_POEM_INTENSITY
 #define GW_POEM_INTENSITY 1.0
@@ -37,9 +35,9 @@
 // defaults here are the NEUTRAL baseline — all-default reproduces the scene's
 // authored look. Every poem reads the same four dials so the whole collection
 // is tunable from one set of controls. Here they drive: MOOD = global dusk
-// warm/cool tone; ENERGY = wing-bob + cloud-bob agitation (amplitude, not rate);
-// DENSITY = how full the sky reads (dusk wash + flock + cloud coverage vs 留白);
-// GLOW = softness of the bird strokes, cloud body, dusk rim and bloom.
+// warm/cool tone; ENERGY = cloud-bob agitation (amplitude, not rate);
+// DENSITY = how full the sky reads (dusk wash + cloud coverage vs 留白);
+// GLOW = softness of the cloud body, dusk rim and bloom.
 #ifndef GW_MOOD
 #define GW_MOOD 0.0      // palette warmth: -1 cold/blue .. 0 neutral .. +1 warm
 #endif
@@ -76,25 +74,6 @@ float jtFbm(vec2 p) {
     return v;
 }
 
-// A single tiny bird "mark": two short strokes meeting at an apex, like the
-// classic distant-bird brushstroke (a soft shallow "v"). p is aspect-corrected
-// position relative to the bird center; s is on-screen scale. Returns 0..1.
-float jtBird(vec2 p, float s) {
-    // Normalise to the bird's local frame.
-    p /= max(s, 1e-4);
-    // Slight wing droop: each wing is a line segment from the apex (0,0)
-    // sloping down-outwards. Distance to the nearer wing stroke.
-    float x = abs(p.x);
-    // Wing line: y = -k*x for x in [0, wingLen]. Distance to that ray.
-    float k = 0.55;                       // wing droop slope
-    float wingLen = 1.0;
-    float xc = clamp(x, 0.0, wingLen);
-    vec2 onWing = vec2(xc, -k * xc);
-    float d = length(vec2(x, p.y) - onWing);
-    // Thin soft stroke.
-    return exp(-d * d / 0.10);
-}
-
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec2 uv = fragCoord / iResolution.xy;
     uv.y = 1.0 - uv.y;                 // host is top-origin: uv.y = 1 at top
@@ -102,24 +81,23 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // Sample the terminal glyph layer with the UNFLIPPED coord.
     vec4 term = texture(iChannel0, fragCoord / iResolution.xy);
 
-    // Aspect-correct so circular glows / birds stay round on any window shape.
+    // Aspect-correct so the cloud / soft glows stay round on any window shape.
     float aspect = iResolution.x / iResolution.y;
     vec2 ap = vec2(uv.x * aspect, uv.y);
 
     vec3 effect = vec3(0.0);
 
-    // GW_ENERGY scales motion AGITATION (the wing-bob / cloud-bob AMPLITUDES),
-    // never the oscillator rates — so dialing it reads as calm<->lively air
-    // instead of teleporting the flock/cloud. Default (1.0) keeps the authored
-    // amplitudes exactly. eAmp = 1.0 at GW_ENERGY=1.
+    // GW_ENERGY scales motion AGITATION (the cloud-bob AMPLITUDE), never the
+    // oscillator rate — so dialing it reads as calm<->lively air instead of
+    // teleporting the cloud. Default (1.0) keeps the authored amplitude exactly.
+    // eAmp = 1.0 at GW_ENERGY=1.
     float eAmp = 0.45 + 0.55 * GW_ENERGY;
 
     // ===================== timeline / seamless loop =======================
     // One full cycle = CYCLE seconds. We build a normalised phase in [0,1)
     // with mod(), so iTime never reaches the fast oscillators raw.
-    //   ph 0.00 .. 0.34  : Phase 1, birds rise and vanish (高飛盡)
-    //   ph 0.30 .. 0.66  : Phase 2, lone cloud drifts out (孤雲獨去)
-    //   ph 0.66 .. 1.00  : held stillness, empty sky (留白)
+    //   ph 0.00 .. 0.74  : the lone cloud drifts slowly out (孤雲獨去閒)
+    //   ph 0.74 .. 1.00  : held stillness, empty sky (留白)
     const float CYCLE = 48.0;
     float ph = fract(iTime / CYCLE);        // 0..1, monotone & loop-safe
 
@@ -193,80 +171,31 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         effect += rimCol * rim * rimDim * 0.45;
     }
 
-    // ===================== Phase 1 — 眾鳥高飛盡 : the flock rises & vanishes =
-    // ~12 tiny bird-marks streaming UPWARD and to the RIGHT, in a loose
-    // diagonal skein. Each bird has a staggered launch so they trail one after
-    // another; as the flock climbs it scales DOWN and fades to nothing near
-    // the top of the sky (高飛盡 — "flown high and gone"). Constant loop bound.
+    // ===================== 孤雲獨去閒 : the lone cloud drifts out ===========
+    // The birds are already gone; the lone cloud is now the scene's SOLE
+    // deliberate motion. ONE soft cloud sits high in the sky and drifts slowly,
+    // idly LEFT → RIGHT, easing out past the right frame edge, fading as it goes
+    // until the sky is bare (孤雲獨去閒 — "a lone cloud, idle, drifts away").
+    // It is a soft fbm-textured wisp — unhurried, the primary focal element.
     {
-        // After the flock is gone we don't draw it (saves it from reappearing
-        // mid-air); gate the whole flock by a window that opens then closes.
-        float flockGate = smoothstep(0.02, 0.10, ph) * smoothstep(0.40, 0.26, ph);
-        // GATE: for ~74% of the cycle the flock window is shut — skip the whole
-        // 12-bird loop. The marks also never sit below uv.y≈0.33 (launch row)
-        // or above ~0.9, so pixels well outside that band can't be lit.
-        if (flockGate > 0.0 && uv.y > 0.30 && uv.y < 0.92) {
-            // Phase-1 progress 0..1 (active only in the first stretch of cycle).
-            float p1 = smoothstep(0.0, 0.30, ph);        // 0 at start → 1
-            const int NBIRDS = 12;
-            for (int i = 0; i < NBIRDS; i++) {
-                float fi = float(i);
-                // Per-bird launch stagger: later birds start later → a trailing
-                // skein rather than a rigid block.
-                float stagger = fi / float(NBIRDS) * 0.45;
-                float prog = clamp((p1 - stagger) / max(1.0 - stagger, 1e-3), 0.0, 1.0);
-                // Opacity: fades in fast at launch, fades to zero as it nears top.
-                float fade = smoothstep(0.0, 0.08, prog) * (1.0 - smoothstep(0.55, 1.0, prog));
-                // Birds not yet launched or fully faded contribute nothing — skip
-                // the jtBird exp() (and the bird is off this pixel anyway).
-                if (fade <= 0.0) continue;
-
-                // Launch point: low and spread across the lower-left/mid sky, just
-                // above the ridge. Up-and-to-the-right travel.
-                float bx0 = 0.18 + 0.045 * fi + 0.05 * jtHash(vec2(fi, 1.0));
-                float by0 = 0.34 + 0.02 * jtHash(vec2(fi, 7.0));
-                // Diagonal travel: rightward + strongly upward (toward top).
-                float bx = bx0 + prog * (0.30 + 0.06 * jtHash(vec2(fi, 3.0)));
-                float by = by0 + prog * (0.52 + 0.04 * jtHash(vec2(fi, 5.0)));
-                // Gentle wing-bob along the path so the flock feels alive.
-                // GW_ENERGY scales the bob AMPLITUDE (calm<->lively), not its rate.
-                by += 0.012 * eAmp * sin(mod(iTime, 7.0) * 2.0 + fi * 1.7);
-
-                vec2 bc = vec2(bx * aspect, by);
-
-                // Cheap reject: if this pixel is far from the bird center relative
-                // to its on-screen size, the gaussian stroke is ~0 — skip jtBird.
-                // GW_GLOW enlarges the soft stroke (the reject radius below uses
-                // s, so it follows automatically); default 1.0 = authored size.
-                vec2 rel = ap - bc;
-                float s = mix(0.030, 0.006, prog) * GW_GLOW;
-                if (dot(rel, rel) > (s * 4.0) * (s * 4.0)) continue;
-
-                float mark = jtBird(rel, s);
-                vec3 birdCol = vec3(0.95, 0.97, 1.00);   // soft off-white #f4f8ff
-                // GW_DENSITY scales the flock's brightness/coverage (lusher >1).
-                effect += birdCol * mark * fade * flockGate * 0.9 * GW_DENSITY;
-            }
-        }
-    }
-
-    // ===================== Phase 2 — 孤雲獨去閒 : the lone cloud drifts out ==
-    // After the birds are gone, ONE soft cloud puff appears high in the sky and
-    // drifts slowly LEFT → RIGHT, fading as it goes, until the sky is bare. It
-    // is a small soft blob textured by fbm — idle and unhurried (閒).
-    {
-        // Phase-2 window: opens as birds finish, closes well before loop end so
-        // the final third of the cycle is empty stillness (留白).
-        float cloudGate = smoothstep(0.30, 0.38, ph) * smoothstep(0.70, 0.60, ph);
-        // GATE: only inside the phase-2 window AND near the cloud's high band
+        // Drift window: occupies most of the cycle (a slow, deliberate crossing),
+        // then closes before loop end so the final stretch is empty stillness
+        // (留白). The long open window keeps the drift serene rather than hurried.
+        float cloudGate = smoothstep(0.02, 0.12, ph) * smoothstep(0.78, 0.66, ph);
+        // GATE: only inside the drift window AND near the cloud's high band
         // (cy≈0.74) does the cloud contribute. Everything else skips the fbm.
-        if (cloudGate > 0.0 && uv.y > 0.55 && uv.y < 0.92) {
-            float p2 = smoothstep(0.30, 0.66, ph);       // 0 → 1 across phase 2
-            // Drift left→right, high in the sky. Starts left-of-center, exits right.
-            float cx = mix(0.22, 0.86, p2);
+        if (cloudGate > 0.0 && uv.y > 0.52 && uv.y < 0.94) {
+            // Drift progress 0→1 across the open window, eased so the cloud
+            // glides off the edge gently rather than snapping out of frame.
+            float p2 = smoothstep(0.0, 0.74, ph);
+            // Slow lateral crossing, biased to the RIGHT of center (terminal text
+            // is densest on the left, so the focal cloud sits clear of it). Starts
+            // just right of center and eases out past the right edge (獨去).
+            float cx = mix(0.50, 1.06, smoothstep(0.0, 1.0, p2));
             // GW_ENERGY scales the cloud's vertical bob AMPLITUDE (calm<->lively),
-            // not the drift rate — the lateral path is unchanged.
-            float cy = 0.74 + 0.015 * eAmp * sin(mod(iTime, 11.0) * 0.5);   // gentle bob
+            // not the drift rate — the lateral path is unchanged. Clouds drift
+            // sideways; this only nudges height a hair, it does NOT rise.
+            float cy = 0.74 + 0.012 * eAmp * sin(mod(iTime, 11.0) * 0.5);   // gentle bob
             vec2 cc = vec2(cx * aspect, cy);
 
             // Soft elliptical body (much wider than tall) with fbm-broken edges so
@@ -276,22 +205,22 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
             // denominators softens/spreads the puff); default 1.0 = authored.
             vec2 d = (ap - cc);
             d.x *= 0.42;                                  // stretch horizontally
-            float body = exp(-dot(d, d) / (0.0052 * GW_GLOW));
+            float body = exp(-dot(d, d) / (0.0078 * GW_GLOW));
             // Soft trailing wisp behind the cloud (to its left), thinner + fainter.
-            vec2 dt = (ap - cc) - vec2(-0.075, 0.004);
+            vec2 dt = (ap - cc) - vec2(-0.095, 0.004);
             dt.x *= 0.30;
-            body += 0.5 * exp(-dot(dt, dt) / (0.0040 * GW_GLOW));
+            body += 0.5 * exp(-dot(dt, dt) / (0.0058 * GW_GLOW));
             // Cheap reject: where the blob is already ~0, skip the fbm texture.
             if (body > 0.0008) {
                 // Texture: fbm modulation drifting with the cloud breaks the edges.
                 float tex = 0.45 + 0.65 * jtFbm(vec2(uv.x * 7.0 - p2 * 2.0, uv.y * 7.0 + 4.0));
                 body *= clamp(tex, 0.0, 1.4);
-                // Fade in on arrival, fade out as it leaves (idle departure).
-                float cloudFade = smoothstep(0.0, 0.18, p2) * (1.0 - smoothstep(0.72, 1.0, p2));
+                // Fade in on arrival, fade out as it eases off the edge (idle departure).
+                float cloudFade = smoothstep(0.0, 0.14, p2) * (1.0 - smoothstep(0.80, 1.0, p2));
 
                 vec3 cloudCol = vec3(0.92, 0.94, 1.00);  // soft luminous off-white
                 // GW_DENSITY scales the cloud's presence/coverage (lusher >1).
-                effect += cloudCol * body * cloudFade * cloudGate * 0.55 * GW_DENSITY;
+                effect += cloudCol * body * cloudFade * cloudGate * 0.70 * GW_DENSITY;
             }
         }
     }
@@ -299,8 +228,8 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // ---- MANDATORY composite : additive, luminous-on-dark, text legible ----
     effect = max(effect, vec3(0.0));
 
-    // GW_MOOD: a global warm/cool tone over the WHOLE scene (dusk, mountain rim,
-    // birds and cloud alike) so the feeling reads at a glance — cold/bleak (-1)
+    // GW_MOOD: a global warm/cool tone over the WHOLE scene (dusk, mountain rim
+    // and cloud alike) so the feeling reads at a glance — cold/bleak (-1)
     // through the authored dusk (0) to warm/tender (+1). Default 0 = identity.
     vec3 moodTint = GW_MOOD >= 0.0
         ? mix(vec3(1.0), vec3(1.18, 1.00, 0.80), GW_MOOD)   // warm: boost R, cut B

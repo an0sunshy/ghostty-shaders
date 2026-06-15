@@ -84,10 +84,13 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
     float aspect = iResolution.x / iResolution.y;
 
-    // The fall occupies a narrow vertical band slightly left of center so
-    // the right two-thirds stays open. x measured from the band axis,
-    // aspect-corrected so the column width is honest at any window shape.
-    float axis = 0.40;
+    // The fall occupies a narrow vertical band right of center, leaving the
+    // left two-thirds open for terminal text (busiest on the left). x measured
+    // from the band axis, aspect-corrected so the column width is honest at any
+    // window shape. Every spatial element below — column, spray, basin mist,
+    // and summit haze — derives from xb/ax, so this single axis moves the whole
+    // fall together.
+    float axis = 0.66;
     float xb = (uv.x - axis) * aspect;        // signed distance from axis
     float ax = abs(xb);
 

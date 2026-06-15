@@ -8,9 +8,6 @@
 // toward the frame edges and grow — the famous 相對出 parallax illusion of
 // peaks "coming forth." The scene composites, from back to front:
 //   - a warm sun-glow low on the central horizon (日邊), the source of light,
-//   - a tiny luminous SAIL point that emerges from the side of that glow and
-//     eases INWARD and slightly UP through the gap, growing as it nears (孤帆
-//     ... 來) — counter-motion to a receding sail: here it APPROACHES,
 //   - a narrow river band threaded between the cliffs carrying downstream
 //     glints that drift toward the BOTTOM of the frame (the current running
 //     out of the gate toward the viewer),
@@ -18,20 +15,19 @@
 //     on a slow seamless loop they translate OUTWARD and scale UP, then ease
 //     back — the peaks advancing as the boat moves through.
 // A clean central column is kept clear of opaque rock so terminal glyphs read
-// (留白); the effect starts from black and ADDS only luminous sun/sail/water —
+// (留白); the effect starts from black and ADDS only luminous sun/water —
 // the dark cliffs are rendered by SUBTRACTING glow where rock occludes, never
 // by washing the whole frame with color.
 //
 // Direction check (host renders upright, top of PNG = top of screen):
 //   - river glints scroll toward the BOTTOM as iTime grows (current outflow);
-//   - the sail drifts from the horizon glow UP-and-IN and grows (approaching);
 //   - the cliffs slide outward toward both edges over the slow loop.
 //
-// Float-safety: the slow cliff loop and the sail's traverse use fract()/
+// Float-safety: the slow cliff loop uses fract()/
 // mod(iTime,P) phases (seamless for arbitrarily large iTime); every sin/cos
 // is fed a mod(iTime, period) argument so nothing degrades as iTime grows.
 //
-// Palette: jade-dark peaks #094228, sun-gold glow #ffad47, white sail #f4f8ff,
+// Palette: jade-dark peaks #094228, sun-gold glow #ffad47,
 //          blue-green water #11403c, deep sky #060a18.
 //
 // Perf: the per-pixel multi-octave fbm is concentrated in the cliff masses
@@ -43,7 +39,7 @@
 //
 // Four "feeling" dials (GW_MOOD / GW_ENERGY / GW_DENSITY / GW_GLOW) ride on top:
 // a global warm/cool tint, the gate-swing + water agitation amplitude, the
-// water-glint + jade fill coverage, and the sun/sail bloom radii. All-default
+// water-glint + jade fill coverage, and the sun bloom radii. All-default
 // (0,1,1,1) reproduces the authored scene exactly.
 
 #ifndef GW_POEM_INTENSITY
@@ -61,7 +57,7 @@
 //              (not the oscillator rates), so peaks/water never teleport
 //   GW_DENSITY fill vs 留白    : 0.3 sparse .. 1 .. 1.8 lush — scales water-glint
 //              coverage + the warm sun-wash + jade body fill
-//   GW_GLOW    bloom/softness  : 0.6 crisp .. 1 .. 2.5 dreamy — scales sun/sail
+//   GW_GLOW    bloom/softness  : 0.6 crisp .. 1 .. 2.5 dreamy — scales sun
 //              glow radii and the soft silhouette/rim edge widths
 #ifndef GW_MOOD
 #define GW_MOOD 0.0
@@ -133,13 +129,12 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
     // Seamless looping clocks. Never feed raw iTime to fast oscillators.
     float tGate  = mod(iTime, 26.0);   // the slow "coming forth" gate loop
-    float tSail  = mod(iTime, 22.0);   // the sail's traverse through the gap
     float tFlow  = mod(iTime, 18.0);   // river current outflow
 
     vec3 effect = vec3(0.0);
 
     // Horizon where river meets the far light. Kept LOW (lower third) so the
-    // luminous focus — sun-glow, sail, water glints — sits beneath the bulk of
+    // luminous focus — sun-glow, water glints — sits beneath the bulk of
     // the terminal text, leaving the upper-center gap dark for 留白.
     float horizon = 0.30;
 
@@ -168,7 +163,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     float rightPeakX = 0.5 + 0.18 + spread;
 
     // ---- 日邊 : warm sun-glow low on the central horizon -------------------
-    // The light source the sail emerges from. Sits in the gap, just at the
+    // The scene's light source. Sits in the gap, just at the
     // waterline. Kept compact so it is a glow on the horizon, not a wash.
     {
         vec2 sunC = vec2(0.5 * aspect, horizon + 0.010);
@@ -234,47 +229,6 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
                 // Default 1.0 keeps the authored strength.
                 effect += wCol * glint * channel * water * 0.30 * GW_DENSITY;
             }
-        }
-    }
-
-    // ---- 孤帆一片日邊來 : a lone sail emerging from the sun, drawing near ----
-    // The sail starts at the side of the sun-glow on the horizon and eases
-    // INWARD-and-UP through the gap, growing as it approaches. Seamless loop:
-    // it appears small from the right side of the glare, crosses toward center
-    // as it nears, then fades and resets. Because it APPROACHES, it grows and
-    // rises slightly off the horizon (counter to a receding sail).
-    {
-        float sp = tSail / 22.0;                  // 0..1 seamless
-        // Visible only across most of the loop; fade in at the sun, fade out
-        // as it would pass the viewer. journey 0..1 is the eased traverse.
-        float journey = smoothstep(0.0, 1.0, sp);
-        // Path: emerges from the SIDE of the sun (right of center, on the
-        // horizon) and moves toward center, rising as it nears so it clears
-        // the sun's glare and reads as a separate, approaching point.
-        float sailX = mix(0.5 + 0.090, 0.5 + 0.012, journey);
-        float sailY = mix(horizon + 0.008, horizon + 0.110, journey);
-        // Grows as it approaches.
-        float sailScale = mix(0.006, 0.024, journey);
-        // Brightness: faint as it leaves the glare, brightest mid-journey,
-        // easing off at the end of the loop so the reset is invisible.
-        float appear = smoothstep(0.0, 0.10, sp);
-        float vanish = smoothstep(1.0, 0.86, sp);
-        float sailBright = appear * vanish;
-        vec2 sailC = vec2(sailX * aspect, sailY);
-        // The sail body: a small upright triangle-ish point of cold white.
-        float pt = tmGlow(ap, sailC, sailScale);
-        // GW_GLOW softens the sail's aura (its bloom halo), leaving the discrete
-        // core size driven by the approach animation. Default 1.0 = authored.
-        float pt2 = tmGlow(ap, sailC, sailScale * 2.4 * GW_GLOW) * 0.4;   // soft aura
-        // Sharpen the core a little so it reads as a discrete sail, not a blob.
-        float core = smoothstep(0.30, 1.0, pt);
-        vec3 sailCol = vec3(0.95, 0.97, 1.00);    // white sail #f4f8ff
-        effect += sailCol * (core * 0.85 + pt2) * sailBright;
-        // A faint wake glint trailing below the sail on the water.
-        float wakeY = sailY - 0.018;
-        if (uv.y < sailY) {
-            float wk = tmGlow(ap, vec2(sailX * aspect, wakeY), sailScale * 1.6);
-            effect += vec3(0.70, 0.80, 0.85) * wk * 0.20 * sailBright;
         }
     }
 
@@ -377,7 +331,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // ---- MANDATORY composite : additive, luminous-on-dark, text legible ----
     effect = max(effect, vec3(0.0));
 
-    // GW_MOOD: a global warm/cool tone over the WHOLE scene (sun-glow, sail,
+    // GW_MOOD: a global warm/cool tone over the WHOLE scene (sun-glow,
     // water and jade rock alike) so the feeling reads at a glance — cold/austere
     // (-1) through the authored jade-and-gold (0) to warm/tender (+1). Default 0
     // = identity (no shift).

@@ -5,29 +5,27 @@
 //
 // A vast desolate dusk plain, almost all 留白. From back to front the scene
 // composites:
-//   - 夕陽西下 : a large dim blood-orange sun low on the RIGHT, SINKING slowly
+//   - 夕陽西下 : a large dim blood-orange sun RIGHT of center, SINKING slowly
 //     toward a flat horizon over a long loop (it moves DOWNWARD as iTime grows,
 //     reddening and dimming as it nears the earth, throwing a low ember band
 //     along the horizon line),
 //   - a cold grey-violet ground glow hugging only the horizon (the plain reads
 //     as emptiness, not a painted floor — the screen center/upper stays dark),
-//   - 西風 : thin fast horizontal wind-streaks of dust blowing LEFT (the west
-//     wind pushes them across the plain at low alpha),
-//   - 瘦馬 / 斷腸人 : a tiny near-black horse-and-rider silhouette PLODDING
-//     slowly LEFT-TO-RIGHT along the horizon, bobbing with each gaunt step,
-//   - 古道 : a faint pale road-track receding to the right where the rider walks,
+//   - 古道西風 : thin fast horizontal wind-streaks of dust blowing LEFT across
+//     the empty old road (the west wind pushes them over the plain at low alpha),
+//   - 古道 : a faint pale road-track receding to the right toward the sun,
 //   - bare crow-perched branches at the LEFT margin (枯藤老樹昏鴉), still and dark.
-// Light is concentrated in the sinking sun + its horizon ember; the figure is a
-// dark accent that draws the eye. Center stays clear for terminal text.
+// Light is concentrated in the sinking sun + its horizon ember; everything else
+// is a dim accent. The left two-thirds and center stay open for terminal text.
 //
-// Palette: ember-orange sun #ff8c42, dusty rose #f6c5be, near-black silhouettes
-//          #06070c, cold grey-violet plain #4a4660.
+// Palette: ember-orange sun #ff8c42, dusty rose #f6c5be, near-black branch +
+//          crow #06070c, cold grey-violet plain #4a4660.
 //
 // Four "feeling" dials tune the mood without redrawing the scene: GW_MOOD warms
-// or cools the whole frame, GW_ENERGY drives the 西風 dust-flutter and the
-// rider's plod-bob, GW_DENSITY fills or empties the plain (dust + ground glow),
-// and GW_GLOW blooms the sinking sun, its halo and the horizon ember band. All
-// default to the neutral baseline so the authored look is reproduced exactly.
+// or cools the whole frame, GW_ENERGY drives the 西風 dust-flutter, GW_DENSITY
+// fills or empties the plain (dust + ground glow), and GW_GLOW blooms the
+// sinking sun, its halo and the horizon ember band. All default to the neutral
+// baseline so the authored look is reproduced exactly.
 
 #ifndef GW_POEM_INTENSITY
 #define GW_POEM_INTENSITY 1.0
@@ -38,8 +36,8 @@
 // defaults here are the NEUTRAL baseline — all-default reproduces the scene's
 // authored look. Every poem reads the same four dials so the whole collection
 // is tunable from one set of controls. In this dusk-plain scene they drive:
-//   MOOD    — global warm/cool tone over sun, ember, plain and silhouettes.
-//   ENERGY  — agitation of the 西風 dust-streaks + the rider's plod-bob.
+//   MOOD    — global warm/cool tone over sun, ember, plain and branch alike.
+//   ENERGY  — agitation of the 西風 dust-streaks crossing the plain.
 //   DENSITY — coverage of the wind-streaks + the cold ground glow (留白).
 //   GLOW    — bloom of the sinking sun, its halo and the horizon ember band.
 #ifndef GW_MOOD
@@ -89,7 +87,7 @@ float tjDisc(vec2 p, vec2 c, float r) {
     return smoothstep(r, r * 0.92, length(p - c));
 }
 
-// 1D capsule/segment distance in aspect space (for branches + legs).
+// 1D capsule/segment distance in aspect space (for the branch + twigs).
 float tjSeg(vec2 p, vec2 a, vec2 b) {
     vec2 pa = p - a, ba = b - a;
     float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-4), 0.0, 1.0);
@@ -109,9 +107,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
     // Seamless looping clocks. Never feed raw iTime to fast oscillators.
     // (The sun's slow descent wraps inline at its use site below.)
-    float tWalk = mod(iTime, 360.0);   // slow: the rider crossing the plain
     float tWind = mod(iTime, 30.0);    // fast: wind-streak scroll
-    float tStep = mod(iTime, 12.0);    // the plodding step cadence
 
     vec3 effect = vec3(0.0);
 
@@ -122,21 +118,22 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // The disc eases DOWNWARD over the long loop, from well above the horizon
     // until it is half-swallowed by it, then loops back. Lower position →
     // redder + dimmer (atmospheric extinction near the earth).
-    float sunX = 0.785;
+    float sunX = 0.66;                 // RIGHT of center: keeps the left two-
+                                       // thirds open for dense terminal text.
     // cos() gives a smooth sink-and-return; phase chosen so it spends most of
     // the loop low and brooding. Range ~horizon+0.18 (high) .. horizon-0.02
     // (half set), so it genuinely touches/dips the horizon line.
     float sunPhase = mod(iTime, 540.0) * (6.2831853 / 540.0);
     float sunY = horizon + 0.085 + 0.105 * cos(sunPhase);
     vec2  sunC = vec2(sunX * aspect, sunY);
-    float sunR = 0.16;                 // a HUGE low sun (dwarfs the figure)
+    float sunR = 0.16;                 // a HUGE low sun, the scene's focal point
 
     // How low is it? 1 when sitting on the horizon, 0 when high.
     float lowness = smoothstep(horizon + 0.19, horizon, sunY);
 
     // Disc: a soft dim body (dusk sun is not a hot lamp). Slight limb glow.
     // GW_GLOW widens the soft bloom radii (body + halo) for a dreamier, hazier
-    // dusk — the hard disc geometry (discCore) stays fixed so the silhouette
+    // dusk — the hard disc geometry (discCore) stays fixed so the disc edge
     // still reads cleanly. Default 1.0 = authored radii.
     float discCore = tjDisc(ap, sunC, sunR);
     float discBody = tjGlow(ap, sunC, sunR * 0.95 * GW_GLOW);
@@ -210,7 +207,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
     // ---- 古道 : a faint pale road-track receding to the right ----
     // A thin lightening of the plain just under the horizon, narrowing toward
-    // the sun (the old road the rider treads). Kept very dim.
+    // the sun (the old road running empty into the dusk). Kept very dim.
     {
         // Road runs along the horizon, brighter toward the right (vanishing
         // toward the sun), within a shallow strip below it.
@@ -220,69 +217,11 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         effect += vec3(0.45, 0.40, 0.42) * onStrip * toRight * 0.05;
     }
 
-    // ---- 瘦馬 + 斷腸人 : tiny dark horse-rider PLODDING left-to-right ----
-    // A small silhouette translating slowly along the horizon, bobbing with
-    // each step. Rendered as a subtractive dark mask (it OCCLUDES the warm
-    // horizon behind it, reading as a black figure against the dusk) plus a
-    // faint warm rim so the gaunt outline stays legible against the dark plain.
-    {
-        // Position: crosses from the left margin to just past mid over the walk
-        // loop, lingering in the left / left-center so it never sits dead-center
-        // over terminal text and never crowds the big sun on the right.
-        float wx = fract(tWalk * (1.0 / 360.0));            // 0..1 monotone
-        float figX = mix(0.14, 0.52, wx);                   // left → left-center
-        // Plodding bob: a small vertical wobble at the step cadence. GW_ENERGY
-        // scales the bob AMPLITUDE (not the cadence rate) via eAmp=1.0 at
-        // default — low energy = a weary near-still plod, high = a livelier step.
-        float eAmp = 0.45 + 0.55 * GW_ENERGY;               // 1.0 at default
-        float step = sin(tStep * (6.2831853 / 6.0));        // 2 steps per 12s loop
-        float bob  = 0.010 * abs(step) * eAmp;              // hooves push body up
-        float figY = horizon + 0.052 + bob;                 // sits ON the road
-        vec2  figC = vec2(figX * aspect, figY);
-
-        // Build the silhouette in a small local aspect-space frame.
-        vec2 q = ap - figC;
-        // Figure scale (tiny — dwarfed by the sun).
-        float S = 0.045;
-        vec2 lq = q / S;                                    // local coords, ~[-1.5,1.5]
-
-        // --- horse body: a low horizontal ellipse ---
-        float body = smoothstep(1.05, 0.85,
-                     length(vec2(lq.x * 0.72, (lq.y + 0.05) * 1.7)));
-        // --- horse neck + head reaching forward (to the right) ---
-        float neck = smoothstep(0.34, 0.20, tjSeg(lq, vec2(0.62, 0.05), vec2(1.18, 0.55)));
-        float head = smoothstep(0.34, 0.20, length((lq - vec2(1.20, 0.60)) * vec2(1.2, 1.0)));
-        // --- four gaunt legs; front pair swings with the step for the plod ---
-        float swing = 0.18 * step;
-        float legF = smoothstep(0.16, 0.08, tjSeg(lq, vec2(0.70, -0.35), vec2(0.78 + swing, -1.35)));
-        float legF2= smoothstep(0.16, 0.08, tjSeg(lq, vec2(0.45, -0.35), vec2(0.40 - swing, -1.35)));
-        float legB = smoothstep(0.16, 0.08, tjSeg(lq, vec2(-0.55, -0.35), vec2(-0.50 - swing, -1.35)));
-        float legB2= smoothstep(0.16, 0.08, tjSeg(lq, vec2(-0.78, -0.35), vec2(-0.86 + swing, -1.35)));
-        // --- a tail trailing back-left (wind-blown) ---
-        float tail = smoothstep(0.20, 0.10, tjSeg(lq, vec2(-0.95, 0.10), vec2(-1.45, -0.45)));
-        // --- the rider: a small hunched torso + head atop the horse's back ---
-        float torso = smoothstep(0.40, 0.26, length((lq - vec2(-0.10, 0.78)) * vec2(1.5, 0.85)));
-        float rhead = smoothstep(0.26, 0.16, length(lq - vec2(-0.05, 1.30)));
-
-        float fig = max(body, max(neck, max(head, max(tail, max(torso, rhead)))));
-        fig = max(fig, max(legF, max(legF2, max(legB, legB2))));
-        fig = clamp(fig, 0.0, 1.0);
-
-        // The figure is near-black: it removes the light behind it.
-        vec3 silhouette = vec3(0.024, 0.027, 0.047);        // #06070c-ish
-        // A faint warm rim (sun catches the gaunt edge) keeps it readable.
-        float rim = smoothstep(0.55, 1.0, fig) - smoothstep(0.8, 1.0, fig);
-        vec3 rimCol = vec3(0.85, 0.45, 0.30);
-
-        effect = effect * (1.0 - fig) + silhouette * fig;
-        effect += rimCol * rim * 0.10;
-    }
-
     // ---- 枯藤老樹昏鴉 : a bare old limb with a perched crow, upper-LEFT ----
     // A withered branch reaches in from the top-left corner and droops to the
     // right; fine bare twigs hang DOWN from it (the gnarled autumn tree), with a
-    // single dusk crow perched near the tip. All dark — it occludes light like
-    // the rider, and hugs the margin so the center stays clear. Near-still: only
+    // single dusk crow perched near the tip. All dark — it occludes the light
+    // behind it, and hugs the margin so the center stays clear. Near-still: only
     // the crow gives a barely-there shuffle.
     {
         // Anchor points of the main limb (aspect space), entering from the
@@ -326,7 +265,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     effect = max(effect, vec3(0.0));
 
     // GW_MOOD: a global warm/cool tone over the WHOLE scene (sun, ember band,
-    // cold plain, dust and the dark figures alike) so the feeling reads at a
+    // cold plain, dust and the dark branch alike) so the feeling reads at a
     // glance — bleak/cold (-1) through the authored dusk (0) to warm/tender
     // (+1). Default 0 = identity (no shift).
     vec3 moodTint = GW_MOOD >= 0.0

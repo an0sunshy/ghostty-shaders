@@ -68,8 +68,9 @@ float fxFbm(vec2 p) {
 // One layer of wind-raked snow streaks. The coordinate frame is rotated so
 // its y-axis points DOWNWIND (the direction the snow falls: down and to the
 // left, ~30deg off vertical). Each filled cell holds a short luminous streak
-// elongated along that downwind axis. Advancing time moves every streak
-// ALONG the downwind axis toward the lower-left — verified visually.
+// elongated along that downwind axis. Advancing time slides every streak
+// ALONG that same axis toward the lower-left, so each streak travels down its
+// own length — the orientation matches the direction of fall.
 // `windAngle` and `gust` are shared by all layers so the whole gale breathes
 // as one. Returns a scalar streak intensity in [0, ~1].
 float snowStreaks(vec2 p, float scale, float speed, float density,
@@ -85,10 +86,11 @@ float snowStreaks(vec2 p, float scale, float speed, float density,
 
     vec2 q = r * scale + seed;
     // Snow FALLS downwind: as t grows, features move toward larger downwind
-    // projection (lower-left). Subtracting from the sampled coordinate makes
-    // the pattern translate in the +downwind direction. mod()'d t upstream
+    // projection (down + left, since uv.y is down). ADDING to the sampled
+    // coordinate makes the pattern translate in the +downwind direction —
+    // streaks descend along the rake, not rise against it. mod()'d t upstream
     // keeps inputs bounded so the loop never loses float precision.
-    q.y -= t * speed;
+    q.y += t * speed;
 
     vec2 cell = floor(q);
     float h = fxHash(cell);
@@ -147,8 +149,10 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
     // A faint drifting turbulence veil so the blizzard reads as volume, not
     // just discrete streaks. Kept very dim and concentrated low so the upper
-    // sky stays open. Scrolls downwind (down + slightly left) over the loop.
-    vec2 veilUv = ac * 2.3 + vec2(-tFlow * 0.18, tFlow * 0.55);
+    // sky stays open. Scrolls downwind (down + slightly left, uv.y down) over
+    // the loop, so the haze drifts with the falling streaks rather than against
+    // them.
+    vec2 veilUv = ac * 2.3 + vec2(tFlow * 0.18, -tFlow * 0.55);
     float veil = fxFbm(veilUv) * fxFbm(veilUv * 1.9 + 5.0);
     veil *= smoothstep(1.0, 0.15, uv.y);            // fade out toward the top
     veil *= (0.10 + 0.16 * gust);                   // breathes with the gale

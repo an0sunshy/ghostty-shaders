@@ -3,10 +3,10 @@
 //   "The falling rose-glow and a lone wild duck fly together;
 //    the autumn waters merge with the boundless sky into one single color."
 //
-// The canonical lone-bird-at-sunset vista. Water and sky share ONE seamless
-// rose-gold wash (共長天一色) — no drawn horizon, only a barely-there shimmer
-// band where they meet to whisper "water starts here". The scene composites,
-// back to front:
+// The canonical sunset-over-autumn-water vista. Water and sky share ONE
+// seamless rose-gold wash (共長天一色) — no drawn horizon, only a barely-there
+// shimmer band where they meet to whisper "water starts here". The scene
+// composites, back to front:
 //   - 共長天一色 : a luminous rose-gold glow that pools toward the TOP (the
 //     burning sky) and toward the BOTTOM (its reflection on the autumn water),
 //     leaving the CENTER — where terminal text sits — open and near-dark
@@ -16,24 +16,18 @@
 //     the lower half is water, felt rather than drawn.
 //   - 落霞 : 2-3 long soft rose-gold cloud-streaks high in the sky, drifting
 //     slowly SIDEWAYS together and breathing gently.
-//   - 孤鶩 : ONE lone wild-duck silhouette gliding across at the same altitude
-//     as the cloud (齊飛), on a shallow arc with a slow sine wing-beat. Rim-lit
-//     by the low sun so it reads dark body / luminous gold edge. It crosses
-//     left to right, dissolves into the glow at the far margin, and respawns at
-//     the near margin — exactly one bird at any instant.
 //   - 秋水 : a faint warm specular shimmer drifting low on the water wash so the
 //     merge-zone shivers, reinforcing 一色.
 // Light pools top + bottom; the center stays open so glyphs read cleanly.
 //
 // Palette: rose-gold #ffad47 / blush #f6c5be high, a thin pale gold-cyan
-//          #c9daf8 accent at the merge zone, lone duck #fef1d1 rim over a near
-//          -black body, dim warm water undertone #7a4706.
+//          #c9daf8 accent at the merge zone, dim warm water undertone #7a4706.
 //
 // Four "feeling" dials tune the scene (all-default = authored look): GW_MOOD
 // warms/cools the whole sunset wash, GW_ENERGY drives motion agitation (cloud
-// breath, the duck's arc/bob, seam + water shimmer), GW_DENSITY fills vs 留白
-// (wash, cloud-streaks, shimmer coverage), and GW_GLOW softens the glows, cloud
-// feathers, shimmer edges and the duck's luminous rim.
+// breath, seam + water shimmer), GW_DENSITY fills vs 留白 (wash, cloud-streaks,
+// shimmer coverage), and GW_GLOW softens the glows, cloud feathers and shimmer
+// edges.
 
 #ifndef GW_POEM_INTENSITY
 #define GW_POEM_INTENSITY 1.0
@@ -44,15 +38,15 @@
 // defaults here are the NEUTRAL baseline — all-default reproduces the scene's
 // authored look. Every poem reads the same four dials so the whole collection
 // is tunable from one set of controls.
-//   GW_MOOD    : global warm/cool tint over the whole sunset wash, clouds,
-//                duck rim and water shimmer (-1 cold/blue .. 0 .. +1 warm).
-//   GW_ENERGY  : motion AGITATION — cloud sideways drift, the lone duck's
-//                wing-beat/body-bob arc, the seam ripple and water shimmer
-//                breathe harder above 1 and settle toward stillness below.
+//   GW_MOOD    : global warm/cool tint over the whole sunset wash, clouds
+//                and water shimmer (-1 cold/blue .. 0 .. +1 warm).
+//   GW_ENERGY  : motion AGITATION — cloud sideways drift, the seam ripple and
+//                water shimmer breathe harder above 1 and settle toward
+//                stillness below.
 //   GW_DENSITY : fill vs 留白 — the rose-gold wash, cloud-streak coverage and
 //                water shimmer thicken (>1 lusher) or thin out (<1 sparser).
-//   GW_GLOW    : bloom/softness of every glow, cloud feather, shimmer edge and
-//                the duck's luminous rim (>1 dreamier, <1 crisper).
+//   GW_GLOW    : bloom/softness of every glow, cloud feather and shimmer edge
+//                (>1 dreamier, <1 crisper).
 #ifndef GW_MOOD
 #define GW_MOOD 0.0      // palette warmth: -1 cold/blue .. 0 neutral .. +1 warm
 #endif
@@ -89,33 +83,6 @@ float twFbm(vec2 p) {
     return v;
 }
 
-// Lone-duck silhouette in duck-local space (centered, x roughly in [-2,2]).
-// `beat` ∈ [-1,1] drives the wing sweep. Returns a soft 0..1 mask of the whole
-// bird. The classic distant-waterfowl read is a shallow "⌒⌒": a small plump
-// body with two SWEPT, CURVED wings — each rises from the shoulder, arcs up to
-// a rounded peak mid-span, then droops to a tapered tip. Curved (not straight
-// V's, which read as antennae) and broad at the root so it reads as wings.
-float twDuck(vec2 q, float beat) {
-    // Body: a small plump ellipse, sitting in the dip between the two wings.
-    vec2 b = q / vec2(0.58, 0.34);
-    float body = 1.0 - smoothstep(0.80, 1.10, length(b));
-    // Head/neck: a small blob leading the body (+x = flight direction).
-    vec2 h = (q - vec2(0.64, 0.09)) / vec2(0.30, 0.26);
-    float head = 1.0 - smoothstep(0.72, 1.08, length(h));
-    // Wings: one swept hump per side. `along` runs 0 at the shoulder to 1 at the
-    // tip; the arc rises as sin(pi*along) and the tip droops slightly past the
-    // peak. `beat` lifts the whole arc (up-stroke) and flattens it (glide).
-    float span  = 1.55;                                   // wing reach each side
-    float aq    = abs(q.x);
-    float along = clamp(aq / span, 0.0, 1.0);
-    float lift  = 0.50 + 0.34 * beat;                     // glide..up-stroke
-    float arcY  = lift * sin(3.14159265 * along) - 0.12 * along * along;  // hump + tip droop
-    float thick = mix(0.20, 0.02, along);                 // broad root -> point tip
-    float onWing = step(0.02, aq) * (1.0 - step(span, aq));
-    float wing = onWing * (1.0 - smoothstep(thick, thick + 0.06, abs(q.y - arcY)));
-    return clamp(body + head + wing, 0.0, 1.0);
-}
-
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec2 uv = fragCoord / iResolution.xy;
     uv.y = 1.0 - uv.y;                 // host is top-origin: uv.y = 1 at top
@@ -123,15 +90,9 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // Sample the terminal glyph layer with the UNFLIPPED coord.
     vec4 term = texture(iChannel0, fragCoord / iResolution.xy);
 
-    // Aspect-correct so circular glows / the duck stay shaped on any window.
-    float aspect = iResolution.x / iResolution.y;
-    vec2 ap = vec2(uv.x * aspect, uv.y);   // aspected position
-
     // Seamless looping clocks. Never feed raw iTime to fast oscillators.
     float tDrift = mod(iTime, 240.0);  // slow horizontal cloud drift
-    float tCross = mod(iTime, 48.0);   // the duck's traverse across the sky
     float tWave  = mod(iTime, 24.0);   // water shimmer
-    float tBeat  = mod(iTime, 3.2);    // wing-beat + body bob
 
     // GW_ENERGY scales motion AGITATION (amplitudes), never the oscillator
     // RATES — dialing it must read as calm<->lively, not teleporting elements.
@@ -202,8 +163,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // ---- 落霞 : 2-3 long soft rose-gold cloud-streaks drifting sideways ----
     // Elongated horizontal fbm bands high in the sky. They translate slowly to
     // the RIGHT together over the long loop and breathe gently. Confined to the
-    // upper field so the center stays open. The lowest streak sets the altitude
-    // the lone duck flies level with (齊飛).
+    // upper field so the center stays open.
     {
         float drift = fract(tDrift * (1.0 / 240.0));   // 0..1 rightward
         const int NCLOUD = 3;
@@ -222,67 +182,6 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
             vec3 cloudCol = mix(roseGold, blush, smoothstep(0.76, 0.90, cy));
             // GW_DENSITY makes the cloud-streaks lusher (>1) or sparser (<1).
             effect += cloudCol * vEnv * band * breath * 0.55 * GW_DENSITY;
-        }
-    }
-
-    // ---- 孤鶩 : ONE lone wild duck gliding across, level with the cloud ----
-    // Bird-and-cloud travelling TOGETHER (齊飛) is the whole point, so the duck
-    // flies at the lowest streak's altitude and drifts the same direction. It
-    // crosses LEFT -> RIGHT on a shallow arc, beats its wings slowly, and is
-    // rim-lit by the low sun so it reads dark body with a luminous gold edge.
-    // Exactly one at any instant: it fades into the glow near the right margin
-    // as it respawns at the left.
-    {
-        float p = fract(tCross * (1.0 / 48.0));    // 0..1 traverse, L->R
-        // March across with a margin beyond both edges so entry/exit are off
-        // -screen rather than popping mid-frame.
-        float duckX = mix(-0.10, 1.10, p) * aspect;
-        // Shallow arc: glides just under the lowest cloud (cy=0.70), dipping a
-        // little mid-pass then easing back up — a gentle bezier feel. Sits low
-        // enough that the bright sky-glow pools ABOVE and behind it, so the dark
-        // body has luminance to bite against (the silhouette must POP).
-        // GW_ENERGY scales the lone duck's motion AGITATION — a deeper arc dip
-        // and a livelier body-bob above 1, calmer/flatter below. Both amplitudes
-        // vanish at the path endpoints, so scaling never makes the bird jump.
-        float arc = 0.665 - 0.045 * eAmp * sin(p * 3.14159265);
-        float beat = sin(tBeat * (6.2831853 / 3.2));   // -1..1 wing-beat
-        float bob  = 0.007 * eAmp * beat;              // body rises on up-stroke
-        vec2 duckC = vec2(duckX, arc + bob);
-
-        // Edge fade so the lone duck dissolves into the rose field at both
-        // margins (落霞 與 孤鶩 齊飛 — bird melting into the same glow).
-        float edgeFade = smoothstep(0.0, 0.10, p) * smoothstep(1.0, 0.90, p);
-
-        // Duck-local coords. Small on screen — a distant solitary bird.
-        float duckScale = 0.060;
-        vec2 q = (ap - duckC) / duckScale;
-        if (abs(q.x) < 3.0 && abs(q.y) < 2.0) {
-            float duckMask = twDuck(q, beat) * edgeFade;
-            if (duckMask > 0.0) {
-                // Rim light: the silhouette edge catches the sun-glow. Interior
-                // is near-black; the feathered edge flares gold. Split the mask
-                // into a solid core (dark body) and its soft shell (luminous
-                // rim) so the bird reads dark-to-gold against the sky.
-                // Widen the solid core so more of the bird reads as dark body,
-                // leaving a thin luminous pinion edge — the silhouette must bite
-                // hard against the bright sky.
-                // GW_GLOW feathers the dark-body / luminous-rim split: a softer,
-                // dreamier gold edge above 1, a crisper silhouette below. The
-                // band widens symmetrically about its center so GW_GLOW=1 is the
-                // exact authored 0.38..0.74 transition.
-                float coreLo = 0.56 - 0.18 * GW_GLOW;
-                float coreHi = 0.56 + 0.18 * GW_GLOW;
-                float core = smoothstep(coreLo, coreHi, duckMask);  // dark interior
-                float rim  = duckMask * (1.0 - core);               // luminous shell
-                vec3 duckDark = vec3(0.023, 0.027, 0.047);      // #06070c body
-                vec3 duckRim  = vec3(0.996, 0.945, 0.820);      // #fef1d1 gold edge
-
-                // Dark body OCCLUDES the wash behind it (near-total), then the
-                // rim ADDS glow. Stronger occlusion = a blacker, sharper bird.
-                effect *= (1.0 - core * 0.94);
-                effect += duckDark * core * 0.10;
-                effect += duckRim  * rim  * 1.00;
-            }
         }
     }
 
@@ -318,10 +217,10 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // ---- MANDATORY composite : additive, luminous-on-dark, text legible ----
     effect = max(effect, vec3(0.0));
 
-    // GW_MOOD: a global warm/cool tone over the WHOLE scene (sky wash, clouds,
-    // the lone duck's rim and the water shimmer alike) so the feeling reads at a
-    // glance — cool/autumnal (-1) through the authored rose-gold (0) to a warmer,
-    // more golden burn (+1). Default 0 = identity (no shift).
+    // GW_MOOD: a global warm/cool tone over the WHOLE scene (sky wash, clouds
+    // and the water shimmer alike) so the feeling reads at a glance — cool
+    // /autumnal (-1) through the authored rose-gold (0) to a warmer, more golden
+    // burn (+1). Default 0 = identity (no shift).
     vec3 moodTint = GW_MOOD >= 0.0
         ? mix(vec3(1.0), vec3(1.18, 1.00, 0.80), GW_MOOD)   // warm: boost R, cut B
         : mix(vec3(1.0), vec3(0.82, 0.95, 1.20), -GW_MOOD); // cool: cut R, boost B

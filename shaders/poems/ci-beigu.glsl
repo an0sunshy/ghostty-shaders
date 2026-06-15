@@ -11,22 +11,18 @@
 //     (殘夜 — the dying night), brightest exactly where the sun is born;
 //   - a warm red-gold sun DISC that eases UPWARD (生 — born from the sea) out
 //     of a horizontal sea-glow band low in the frame; its reflection a short
-//     shimmering vertical streak on rippling water directly below it;
-//   - a faint, still single sail-triangle moored low (the lone boat);
-//   - high in the frame, ONE small luminous goose glyph (歸雁) drifting slowly
-//     UP toward the top-right corner on a gentle wing-bob, fading at the edge —
-//     a lone bird returning north toward Luoyang.
+//     shimmering vertical streak on rippling water directly below it.
 // The center stays open dawn-sky for text (留白); light pools at the lower
-// waterline and the single rising disc, with the goose a faint counter-note high.
+// waterline and the single rising disc.
 //
 // Palette: rising sun #ff8c42→#fef1d1, dawn-rose horizon #f6c5be,
-//          draining night-indigo zenith #0a1024, pale goose #e8f0ff.
+//          draining night-indigo zenith #0a1024.
 //
 // Four "feeling" dials tune the scene from one set of controls (all-default =
 // authored look): GW_MOOD warms/cools the whole frame; GW_ENERGY scales the
-// water-ripple and goose wing-beat AGITATION (not the sun's climb rate);
-// GW_DENSITY scales the dawn-sky glow + sail/goose fill (留白); GW_GLOW scales
-// the sun's corona, reflection and goose-glint bloom radii.
+// water-ripple AGITATION (not the sun's climb rate); GW_DENSITY scales the
+// dawn-sky glow fill (留白); GW_GLOW scales the sun's corona and reflection
+// bloom radii.
 
 #ifndef GW_POEM_INTENSITY
 #define GW_POEM_INTENSITY 1.0
@@ -37,12 +33,12 @@
 // defaults here are the NEUTRAL baseline — all-default reproduces the scene's
 // authored look. Every poem reads the same four dials so the whole collection
 // is tunable from one set of controls. In THIS dawn scene they drive:
-//   MOOD    — global warm/cool tone over sky, sun, sail and goose alike;
-//   ENERGY  — agitation amplitude: water-ripple wander + the goose's wing-beat
-//             and bob (the rates — sun's climb, ripple scroll — stay fixed);
-//   DENSITY — fill vs 留白: the dawn-sky glow plus the sail/goose presence;
-//   GLOW    — bloom/softness: the sun's corona, reflection streak and the
-//             goose's glint radii / soft-edge widths.
+//   MOOD    — global warm/cool tone over sky, sun and water alike;
+//   ENERGY  — agitation amplitude: water-ripple wander (the rates — sun's
+//             climb, ripple scroll — stay fixed);
+//   DENSITY — fill vs 留白: the dawn-sky glow;
+//   GLOW    — bloom/softness: the sun's corona and reflection streak radii /
+//             soft-edge widths.
 #ifndef GW_MOOD
 #define GW_MOOD 0.0      // palette warmth: -1 cold/blue .. 0 neutral .. +1 warm
 #endif
@@ -99,7 +95,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // Seamless looping clocks. Never feed raw iTime to fast oscillators.
     // The sun's birth is the LEAD motion, so its loop is short enough to read as
     // a continuous climb within a few seconds (≈40 s, seamless via cosine); the
-    // ripple is faster still. The goose rides its own clock below.
+    // ripple is faster still.
     float tBirth = mod(iTime, 40.0);    // sun's birth + sky drain (lead motion)
     float tRip   = mod(iTime, 60.0);    // water ripple / shimmer
 
@@ -141,10 +137,10 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     float rippleDisp = 0.0;
     float ripple = 0.5;
     bool inWater = uv.y < waterY + 0.02;
-    // GW_ENERGY scales AGITATION (the displacement AMPLITUDE of the ripple wander
-    // and, below, the goose's wing-beat + bob), NOT the scroll/climb rates — so
-    // dialling it reads as calm<->lively water and flight rather than the sun or
-    // ripples jumping to new phases. Default (1.0) keeps the authored motion.
+    // GW_ENERGY scales AGITATION (the displacement AMPLITUDE of the ripple
+    // wander), NOT the scroll/climb rates — so dialling it reads as calm<->lively
+    // water rather than the sun or ripples jumping to new phases. Default (1.0)
+    // keeps the authored motion.
     float eAmp = 0.45 + 0.55 * GW_ENERGY;             // 1.0 at default
     if (inWater) {
         float scroll = fract(tRip * (1.0 / 60.0)) * 3.0;
@@ -209,77 +205,11 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         }
     }
 
-    // ---- the lone moored sail — a faint, still triangle low on the water ----
-    // 江 (the river boat). Kept dim and small, off to one side so it anchors the
-    // scene without competing with the sun or crowding the text center.
-    {
-        float sailX = 0.255;
-        float sailBaseY = waterY + 0.010;            // sits on the water surface
-        float sailH = 0.085;
-        // Triangle: bright when uv.y is within the sail's height above the base,
-        // and horizontal half-width shrinks linearly to the peak (a taut sail).
-        float yy = (uv.y - sailBaseY) / sailH;       // 0 at base → 1 at peak
-        if (yy > 0.0 && yy < 1.0) {
-            float halfW = 0.045 * (1.0 - yy);         // taut leading edge
-            float dxs = abs(uv.x - sailX) * aspect;
-            float sail = smoothstep(halfW, halfW * 0.55, dxs);
-            // Faint cool-warm wash so it reads as a pale sail catching dawn light.
-            // GW_DENSITY scales its presence (part of the scene's fill); default 1.
-            vec3 sailCol = vec3(0.70, 0.66, 0.66);
-            effect += sailCol * sail * 0.18 * GW_DENSITY;
-        }
-    }
-
-    // ---- 歸雁 : one lone homing goose drifting UP toward the top-right ----
-    // A single small luminous bird, high in the frame, travelling UPWARD and to
-    // the right (returning north toward Luoyang), fading as it nears the corner.
-    // Rendered as a thin open "v" of two wing-strokes that BEAT as it flies — a
-    // distant bird seen from below, evocative not literal (no body blob, so it
-    // never reads as a solid triangle or a glyph).
-    {
-        // Drift across the upper sky on its own ≈26 s loop so the crossing is
-        // visible within a few seconds yet seamless. gp is monotone 0..1.
-        float gp = fract(mod(iTime, 26.0) * (1.0 / 26.0));
-        float gx = mix(0.40, 0.86, gp);               // travels right
-        float gy = mix(0.66, 0.93, gp);               // travels UP toward the top
-        // Wing-beat: the chevron opens and closes as the goose flaps. Faster than
-        // the drift, seamless via mod. Steeper droop = wings down mid-beat.
-        // GW_ENERGY scales the beat's SWING and the bob AMPLITUDE (not the 2.3
-        // flap rate) so the bird flaps calmly (<1) or vigorously (>1); the beat's
-        // mean (0.30) is held fixed so default 1 leaves the flight authored.
-        float beatOsc = 0.5 + 0.5 * sin(mod(iTime, 7.0) * 2.3);
-        float beat = 0.30 + 0.34 * (0.5 + (beatOsc - 0.5) * eAmp);
-        // Slight vertical bob synced loosely to the beat.
-        float bob = 0.006 * eAmp * sin(mod(iTime, 7.0) * 2.3);
-        vec2 gC = vec2(gx * aspect, gy + bob);
-        vec2 lp = ap - gC;                            // local, aspect-corrected
-        float wx = abs(lp.x);
-        // Open chevron: each wing is the line y = +beat*|x| (a soft "v"), so the
-        // bird points the way it travels. Distance to that line, with the stroke
-        // fading out past the wingtips, gives two thin luminous wing marks.
-        float wingSpan = 0.030;
-        float lineY = beat * wx;
-        float dToWing = abs(lp.y - lineY);
-        float along = smoothstep(wingSpan, 0.0, wx);  // fade past the wingtips
-        // Thin wing strokes only — no central body fill, so it stays bird-like.
-        // GW_GLOW softens the wing stroke and the body glint radii (crisp<->dreamy).
-        float bird = smoothstep(0.009 * GW_GLOW, 0.0, dToWing) * along;
-        // A tiny faint glint where the wings meet (the body), kept small.
-        bird += cbGlow(ap, gC, 0.006 * GW_GLOW) * 0.45;
-        // Fade as it nears the top-right edge (receding into the dawn), but never
-        // fully vanish mid-flight.
-        float edgeFade = smoothstep(0.96, 0.80, gy) * smoothstep(0.92, 0.74, gx);
-        edgeFade = clamp(edgeFade + 0.30, 0.0, 1.0);
-        // GW_DENSITY scales the goose's presence (part of the scene's fill); 1 = authored.
-        vec3 gooseCol = vec3(0.91, 0.95, 1.00);       // pale goose #e8f0ff
-        effect += gooseCol * bird * edgeFade * 0.60 * GW_DENSITY;
-    }
-
     // ---- MANDATORY composite : additive, luminous-on-dark, text legible ----
     effect = max(effect, vec3(0.0));
 
-    // GW_MOOD: a global warm/cool tone over the WHOLE scene (sky, sun, sail and
-    // goose alike) so the feeling reads at a glance — cold/bleak (-1) through the
+    // GW_MOOD: a global warm/cool tone over the WHOLE scene (sky, sun, water
+    // alike) so the feeling reads at a glance — cold/bleak (-1) through the
     // authored dawn (0) to warm/tender (+1). Default 0 = identity (no shift).
     vec3 moodTint = GW_MOOD >= 0.0
         ? mix(vec3(1.0), vec3(1.18, 1.00, 0.80), GW_MOOD)   // warm: boost R, cut B

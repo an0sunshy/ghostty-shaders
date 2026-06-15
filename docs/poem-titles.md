@@ -32,13 +32,10 @@ records what was used and why.
 | feng-qiao-ye-bo | 楓橋夜泊 | Night Mooring at Maple Bridge | Bynner "A Night-Mooring near Maple Bridge" ([Jade Mountain](https://en.wikisource.org/wiki/The_Jade_Mountain/A_Night-Mooring_near_Maple_Bridge)). |
 | shi-zhi-sai-shang | 使至塞上 | On a Mission to the Frontier | Xu Yuanchong "On Mission to the Frontier". |
 | deng-guanque-lou | 登鸛雀樓 | Climbing Stork Tower | [Wikipedia](https://en.wikipedia.org/wiki/Wang_Zhihuan); Bynner "At Heron Lodge", Xu "On the Stork Tower". |
-| yu-ge-zi | 漁歌子 | Fisherman's Song | Cí by tune-name; Xu Yuanchong "A Fisherman's Song". |
 | tianjingsha-qiusi | 天淨沙·秋思 | Autumn Thoughts (Tune: Sky-Clear Sand) | [Wikipedia](https://en.wikipedia.org/wiki/Ma_Zhiyuan) "Autumn Thoughts"; 天淨沙 is the qupai. |
 | xiao-chi | 小池 | Small Pond | No single standard. |
 | wang-tianmen-shan | 望天門山 | Gazing at Heaven's Gate Mountains | Xu Yuanchong "Mount Heaven's Gate Viewed from Afar". |
-| mu-jiang-yin | 暮江吟 | Song of the River at Dusk | No single standard. |
 | chibi-huai-gu | 念奴嬌·赤壁懷古 | Charms of Niannu: Meditation on Red Cliff | Cí by tune-name; academic "The Charm of Niannu: Meditation on the Past at Red Cliff"; Xu "Charm of a Maiden Singer". Recognizable element: Red Cliff. |
-| zao-fa-baidi | 早發白帝城 | Leaving Baidi at Dawn | Concise; Xu Yuanchong "Leaving the White Emperor Town for Jiangling" (also 下江陵). |
 | qiu-xi | 秋夕 | Autumn Night | Short form of Bynner "In the Autumn Night" ([Jade Mountain](https://en.wikisource.org/wiki/The_Jade_Mountain/In_the_Autumn_Night)). |
 | du-zuo-jingting | 獨坐敬亭山 | Sitting Alone by Jingting Mountain | No single standard; also widely "Alone Looking at the Mountain", Xu "Sitting Alone in Face of Peak Jingting". |
 | guan-canghai | 觀滄海 | Gazing at the Vast Sea | No single standard; also "Viewing the Ocean", "The Sea". A section of 步出夏門行. |

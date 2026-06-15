@@ -10,7 +10,7 @@ organized into **collections** you can run two ways:
   swaps Ghostty's `custom-shader` to match (clear day, clear night with a
   phase-accurate moon, clouds, rain, snow, thunderstorm), reloading every open
   window in place, no restart.
-- **poems** — 28 animated scenes evoking the 意境 of classical Chinese poems
+- **poems** — 25 animated scenes evoking the 意境 of classical Chinese poems
   (静夜思, 春江花月夜, 江雪, …). Pin one with `ghostty-shaders use <scene>` and
   keep it, or `ghostty-shaders random` for a fresh one.
 
