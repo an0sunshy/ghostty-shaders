@@ -98,9 +98,8 @@ If the poem's central image is a figure, do one of:
 
 This is a curation criterion, not a code check — there is no blocklist.
 Examples handled on these grounds: the boat in `zao-fa-baidi` and the egret in
-`yu-ge-zi` were curated out; the moored sail and homing goose were stripped
-from `ci-beigu`, and the lone sail from `wang-tianmen-shan`, in both cases
-keeping the field-scene (sunrise; cliffs-and-sun) that stood on its own.
+`yu-ge-zi` were curated out; the lone sail was stripped from `wang-tianmen-shan`,
+keeping the cliffs-and-sun field-scene that stood on its own.
 
 ### Move natural effects in the physically correct direction
 

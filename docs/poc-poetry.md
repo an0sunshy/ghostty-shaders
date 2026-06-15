@@ -1,7 +1,7 @@
 # POC: 唐诗 / 宋词 意境 — animated poem backgrounds
 
-**Status: POC for the shipped `poems` collection — 37 scenes built, 25 kept after curation.**
-25 animated GLSL terminal backgrounds (of 37 built), each evoking the 意境 of one famous
+**Status: POC for the shipped `poems` collection — 37 scenes built, 24 kept after curation.**
+24 animated GLSL terminal backgrounds (of 37 built), each evoking the 意境 of one famous
 classical Chinese poem. Built and refined by multi-agent orchestration — curation rounds
 (curators by thematic lens → synthesis), parallel build rounds (one agent per poem: write +
 validate + self-render + judge), a judge-and-repair pass, and performance-gating passes. All
@@ -13,13 +13,13 @@ Two knobs (baked by `ghostty-shaders apply` + gallery controls): `GW_POEM_INTENS
 
 ![the full collection](poc-poetry/contact-all.png)
 
-## The collection (25)
+## The collection (24)
 
 _Numbered by the original 37-scene POC index; the gaps are scenes curated out
 before shipping: yong-liu (13), song-meng-haoran (18), yu-ge-zi (19),
 mu-jiang-yin (23), zhu-li-guan (24), zao-fa-baidi (26), qing-yu-an (29),
 chun-ye-xi-yu (32), jiang-nan-chun (33), yu-jia-ao-qiusi (34), jian-jia (35),
-yanmen-taishou (36)._
+yanmen-taishou (36), ci-beigu (37)._
 
 | # | scene | poem | author | signature line | effect |
 |---|---|---|---|---|---|
@@ -47,7 +47,6 @@ yanmen-taishou (36)._
 | 28 | `du-zuo-jingting` | 獨坐敬亭山 | 李白 | 孤雲獨去閒，只有敬亭山。 | A single lone cloud drifts slowly and idly across the dusk sky, easing from just right of center out past the frame edge (孤雲獨去閒) and into stillness, over the dark silhouette of 敬亭山 — the quiet, deliberate sole motion. |
 | 30 | `guan-canghai` | 觀滄海 | 曹操 | 秋風蕭瑟，洪波湧起。日月之行，若出其中。 | The ENTIRE sea-plane undulates — broad low-frequency swell-lines roll steadily across the frame from horizon toward the viewer, the surface rising… |
 | 31 | `teng-wang-ge` | 滕王閣序 | 王勃 | 秋水共長天一色。 | Long soft rose-gold cloud-bands (落霞) drift slowly and horizontally across the upper field above a seamless water-and-sky horizon of one color (秋水共長天一色), the water shimmering faintly below. |
-| 37 | `ci-beigu` | 次北固山下 | 王灣 | 海日生殘夜，江春入舊年。鄉書何處達，歸雁洛陽邊。 | TWO motions: the red sun-disc RISES (生 — born from the sea), easing upward out of a horizontal water-glow at the bottom while the sky overhead… |
 
 ## Configurable compute (supersample dial)
 
@@ -72,7 +71,7 @@ GHOSTTY_SHADERS_POEM_INTENSITY=0.8 ghostty-shaders apply jiang-xue   # live in G
 - Public-domain classical works (Han/Tang/Song/Yuan/Shijing). The GLSL is original work
   matching each poem's imagery/motion; self-contained, house scene contract. Briefs:
   `docs/poc-poetry/poems.json`.
-- Verified: tests 123/123 (gallery==scenes invariant for all 31 scenes); glslangValidator
+- Verified: tests 123/123 (gallery==scenes invariant for all 30 scenes); glslangValidator
   passes for every poem scene across gl410 + es300 × bare + defines.
 - **Compute:** poems are opt-in static art, so the collection carries a higher per-frame
   ceiling than weather's 5% — `budget_pct = 75` in `collections/poems.conf`, enforced by

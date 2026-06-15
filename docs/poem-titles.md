@@ -40,7 +40,6 @@ records what was used and why.
 | du-zuo-jingting | 獨坐敬亭山 | Sitting Alone by Jingting Mountain | No single standard; also widely "Alone Looking at the Mountain", Xu "Sitting Alone in Face of Peak Jingting". |
 | guan-canghai | 觀滄海 | Gazing at the Vast Sea | No single standard; also "Viewing the Ocean", "The Sea". A section of 步出夏門行. |
 | teng-wang-ge | 滕王閣序 | Preface to the Pavilion of Prince Teng | [Wikipedia](https://en.wikipedia.org/wiki/Tengwang_Ge_Xu). A parallel-prose preface, not a poem. |
-| ci-beigu | 次北固山下 | Mooring Below Beigu Mountain | Bynner "A Mooring under North Fort Hill" ([Jade Mountain](https://en.wikisource.org/wiki/The_Jade_Mountain/A_Mooring_under_North_Fort_Hill)). |
 
 Sources were gathered by a web-research pass over English Wikipedia, Wikisource
 (*The Jade Mountain*), and cn-poetry.com; where a claim could not be verified it
