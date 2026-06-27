@@ -1,0 +1,256 @@
+#!/usr/bin/env bash
+# select — the poem scene matcher. Runs the input providers to gather live
+# facts (weather, time, season, festival), scores every poem against those
+# facts via the declarative rule engine (collections/poems.{index,rules}.json +
+# scripts/match-rules.jq), penalizes recently-shown scenes, then samples one
+# with a temperature-controlled weighted-random draw and applies it.
+#
+#   ghostty-shaders select            pick now from the poems and apply it
+#   ghostty-shaders select --print    dry-run: print the pick (+ facts on
+#                                      stderr); apply nothing, touch no history
+#   ghostty-shaders select --facts F  use facts JSON from file F (skip providers)
+#
+# Determinism seams (tests): GHOSTTY_SHADERS_FACTS (inline facts JSON),
+# GHOSTTY_SHADERS_SELECT_UNIFORM (the [0,1) draw), GHOSTTY_SHADERS_SELECT_TEMP
+# (softmax temperature; 0 ⇒ deterministic argmax). With these pinned the pick
+# is fully reproducible.
+set -euo pipefail
+
+# Resolve real dir, following symlinks (~/.local/bin install). Portable readlink.
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+    D="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [ "${SOURCE#/}" = "$SOURCE" ] && SOURCE="$D/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+SHADERS_DIR="$REPO_DIR/shaders"
+PROVIDERS_DIR="$SCRIPT_DIR/providers"
+JQ_PROG="$REPO_DIR/scripts/match-rules.jq"
+RULES_FILE="$REPO_DIR/collections/poems.rules.json"
+INDEX_FILE="$REPO_DIR/collections/poems.index.json"
+CONF="$REPO_DIR/collections/poems.conf"
+APPLY="$SCRIPT_DIR/apply"
+
+CACHE_DIR="$HOME/Library/Caches/ghostty-shaders"
+HISTORY_FILE="$CACHE_DIR/select-history"
+LOG_DIR="$HOME/Library/Logs"
+LOG_FILE="$LOG_DIR/ghostty-shaders-poll.log"
+
+LOG_MAX_BYTES="${GHOSTTY_SHADERS_LOG_MAX:-262144}"   # 256k
+
+log() { printf '%s ghostty-shaders select: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
+
+# shellcheck source=../../scripts/scene-discovery.sh disable=SC1091
+. "$REPO_DIR/scripts/scene-discovery.sh"
+# shellcheck source=../../scripts/location-lib.sh disable=SC1091
+. "$REPO_DIR/scripts/location-lib.sh"
+
+# Poll state shared with the toggle subcommand and `use`/`random` pins, so the
+# cron poller respects a manual pin/pause instead of fighting it. Paths are
+# defined here (not taken from the sourced lib) so they read clearly.
+TOGGLE="$SCRIPT_DIR/toggle"
+CONFIG_DIR="$HOME/.config/ghostty-shaders"
+SELECTION_FILE="$CONFIG_DIR/selection"
+ENV_FILE="$CONFIG_DIR/config.env"
+PAUSE_MARKER="$CACHE_DIR/paused"
+BATTERY_PAUSE_MARKER="$CACHE_DIR/paused-by-battery"
+MANUAL_RESUME_MARKER="$CACHE_DIR/manual-resume-override"
+
+# --------------------------------------------------------------- pure helpers
+
+# Read a numeric knob from poems.conf (same `key = value` shape as the rest of
+# the project's .conf files), printing $2 when the key is absent.
+select_conf_num() {
+    local key="$1" def="$2" v
+    v=$(sed -nE "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*([0-9.]+).*$/\1/p" "$CONF" 2>/dev/null | head -1)
+    printf '%s' "${v:-$def}"
+}
+
+# Facts JSON on stdin → "<scene>\t<score>" per non-vetoed scene, via the rule
+# engine. Pure given the committed rules/index files.
+score_scenes() {
+    jq -rf "$JQ_PROG" \
+        --argjson rules "$(cat "$RULES_FILE")" \
+        --argjson index "$(cat "$INDEX_FILE")"
+}
+
+# "<scene>\t<score>" lines on stdin → one chosen scene. Recently-shown scenes
+# (hist, comma-separated) lose `rpen`; remaining scores go through a softmax at
+# temperature `temp` and a cumulative draw against uniform `u` ∈ [0,1).
+# temp<=0 ⇒ deterministic argmax. Pure: same inputs ⇒ same scene.
+sample_scene() {
+    local temp="$1" u="$2" hist="$3" rpen="$4"
+    awk -v temp="$temp" -v u="$u" -v hist="$hist" -v rpen="$rpen" '
+        BEGIN {
+            n = 0; m = split(hist, h, ",");
+            for (i = 1; i <= m; i++) if (h[i] != "") pen[h[i]] = rpen;
+        }
+        { s[++n] = $1; v[n] = $2 + 0; if ($1 in pen) v[n] -= pen[$1]; }
+        END {
+            if (n == 0) exit 1;
+            mx = v[1]; for (i = 2; i <= n; i++) if (v[i] > mx) mx = v[i];
+            if (temp + 0 <= 0) {
+                best = 1; for (i = 2; i <= n; i++) if (v[i] > v[best]) best = i;
+                print s[best]; exit 0;
+            }
+            tot = 0;
+            for (i = 1; i <= n; i++) { w[i] = exp((v[i] - mx) / temp); tot += w[i]; }
+            target = u * tot; c = 0;
+            for (i = 1; i <= n; i++) { c += w[i]; if (c >= target) { print s[i]; exit 0; } }
+            print s[n];
+        }'
+}
+
+# jq-absent degraded pick: a sensible poem by local hour (logged by caller).
+fallback_pick() {
+    local hh; hh=$((10#$(date +%H)))
+    if   (( hh < 5 || hh >= 20 )); then echo jing-ye-si       # night → moonlight
+    elif (( hh < 8 ));             then echo chun-xiao         # dawn
+    elif (( hh < 17 ));            then echo guan-canghai      # day → open sea
+    else                                echo teng-wang-ge      # dusk → sunset clouds
+    fi
+}
+
+# When sourced (tests), stop here: everything below acts / produces output.
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then return 0; fi
+
+# --------------------------------------------------------------- impure
+
+# Newest-last history; the last N entries, comma-joined, for the recency penalty.
+recent_history() {
+    local n="$1"
+    [[ -f $HISTORY_FILE ]] || return 0
+    tail -n "$n" "$HISTORY_FILE" | paste -sd, - 2>/dev/null
+}
+
+record_history() {
+    mkdir -p "$CACHE_DIR"
+    printf '%s\n' "$1" >> "$HISTORY_FILE"
+    # Keep the tail bounded.
+    tail -n 50 "$HISTORY_FILE" > "$HISTORY_FILE.tmp" 2>/dev/null && mv "$HISTORY_FILE.tmp" "$HISTORY_FILE"
+}
+
+# Self-rotate the poll log in place, keeping the last $LOG_MAX_BYTES bytes (same
+# approach as the legacy poller). No-op when under the cap; portable (tail -c).
+truncate_log() {
+    [ -f "$LOG_FILE" ] || return 0
+    local size
+    size=$(wc -c <"$LOG_FILE" 2>/dev/null || echo 0)
+    if [ "$size" -gt "$LOG_MAX_BYTES" ]; then
+        tail -c "$LOG_MAX_BYTES" "$LOG_FILE" >"$LOG_FILE.tmp" 2>/dev/null \
+            && mv "$LOG_FILE.tmp" "$LOG_FILE"
+    fi
+}
+
+gather_facts() {
+    if [[ -n ${FACTS_FILE:-} ]];               then cat "$FACTS_FILE";              return; fi
+    if [[ -n ${GHOSTTY_SHADERS_FACTS:-} ]];    then printf '%s' "$GHOSTTY_SHADERS_FACTS"; return; fi
+    mkdir -p "$LOG_DIR"
+    local p
+    {
+        for p in "$PROVIDERS_DIR"/*; do
+            [[ -x $p ]] || continue
+            "$p" 2>>"$LOG_FILE" || true
+        done
+    } | jq -s 'add // {}'
+}
+
+PRINT=0
+CRON=0
+FACTS_FILE=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --print)  PRINT=1; shift ;;
+        --facts)  FACTS_FILE="${2:-}"; shift 2 ;;
+        --cron)   CRON=1; shift ;;
+        *)        echo "usage: ghostty-shaders select [--print] [--cron] [--facts FILE]" >&2; exit 1 ;;
+    esac
+done
+
+# Poller guards (cron only): respect a user's static pin and pause state so the
+# 5-min LaunchAgent never clobbers an explicit `use` pick or a paused shader.
+# Mirrors the legacy weather poller's stand-down logic.
+if [[ $CRON -eq 1 ]]; then
+    mkdir -p "$CACHE_DIR" "$LOG_DIR" "$CONFIG_DIR"
+    trap truncate_log EXIT
+
+    if [[ -f $SELECTION_FILE ]]; then
+        log "static selection active ($(cat "$SELECTION_FILE" 2>/dev/null)); skipping auto-match"
+        exit 0
+    fi
+
+    # Battery awareness: opt-in via PAUSE_ON_BATTERY=true in config.env.
+    pause_on_batt=$(read_env_var PAUSE_ON_BATTERY "$ENV_FILE" || true)
+    pause_on_batt=$(printf '%s' "$pause_on_batt" | tr '[:upper:]' '[:lower:]')
+    if [[ $pause_on_batt == "true" ]]; then
+        power_source=$(pmset -g batt 2>/dev/null | head -1)
+        if [[ $power_source == *"Battery Power"* ]]; then
+            if [[ -f $MANUAL_RESUME_MARKER ]]; then
+                log "on battery but manual-resume override is active; proceeding"
+            elif [[ ! -f $PAUSE_MARKER ]]; then
+                log "on battery + PAUSE_ON_BATTERY=true → pausing shader"
+                "$TOGGLE" --pause >/dev/null
+                touch "$BATTERY_PAUSE_MARKER"
+                exit 0
+            else
+                exit 0   # already paused; nothing to do
+            fi
+        else
+            rm -f "$MANUAL_RESUME_MARKER"
+            if [[ -f $BATTERY_PAUSE_MARKER && -f $PAUSE_MARKER ]]; then
+                log "on AC + battery-pause marker → clearing pause and refreshing scene"
+                rm -f "$BATTERY_PAUSE_MARKER" "$PAUSE_MARKER"
+            fi
+        fi
+    fi
+
+    if [[ -f $PAUSE_MARKER ]]; then
+        log "shader is paused (marker present); skipping auto-match"
+        exit 0
+    fi
+elif [[ $PRINT -eq 0 ]]; then
+    # A manual (non-dry-run) `select` is an explicit "auto-match now": drop any
+    # static pin so the cron poller resumes matching from here.
+    rm -f "$SELECTION_FILE" 2>/dev/null || true
+fi
+
+# jq is required for the rule engine; degrade gracefully without it.
+if ! command -v jq >/dev/null 2>&1; then
+    SCENE=$(fallback_pick)
+    log "jq not found — degraded pick by local hour → $SCENE (install jq for full matching)"
+    if [[ $PRINT -eq 1 ]]; then echo "$SCENE"; exit 0; fi
+    exec "$APPLY" "$SCENE"
+fi
+
+FACTS=$(gather_facts)
+[[ -n $FACTS ]] || FACTS='{}'
+
+SCORES=$(printf '%s' "$FACTS" | score_scenes 2>/dev/null || true)
+if [[ -z $SCORES ]]; then
+    SCENE=$(fallback_pick)
+    log "no candidate scenes from rules (all vetoed?) — fallback → $SCENE"
+else
+    TEMP="${GHOSTTY_SHADERS_SELECT_TEMP:-$(select_conf_num selection_temperature 0.6)}"
+    WINDOW=$(select_conf_num recency_window 4)
+    RPEN=$(select_conf_num recency_penalty 2.0)
+    UNIFORM="${GHOSTTY_SHADERS_SELECT_UNIFORM:-$(awk -v r=$RANDOM 'BEGIN { print r / 32767 }')}"
+    HIST=$(recent_history "$WINDOW")
+    SCENE=$(printf '%s\n' "$SCORES" | sample_scene "$TEMP" "$UNIFORM" "$HIST" "$RPEN")
+fi
+
+# Resolve to a real scene file; guard against an index/shaders drift.
+scene_path "$SHADERS_DIR" "$SCENE" >/dev/null \
+    || { log "chosen scene '$SCENE' has no shader file; aborting"; exit 1; }
+
+if [[ $PRINT -eq 1 ]]; then
+    log "facts: $FACTS"
+    [[ -n ${SCORES:-} ]] && printf '%s\n' "$SCORES" | sort -t"$(printf '\t')" -k2 -nr | head -3 | while IFS=$'\t' read -r sc va; do log "  top: $sc ($va)"; done
+    echo "$SCENE"
+    exit 0
+fi
+
+record_history "$SCENE"
+log "matched → $SCENE"
+exec "$APPLY" "$SCENE"

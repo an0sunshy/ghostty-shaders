@@ -24,15 +24,19 @@ bin/
   ghostty-shaders             the single dispatcher (the only command on PATH)
 libexec/ghostty-shaders/      subcommand implementations (not on PATH):
   apply                       apply a scene + reload Ghostty
-  weather                     fetch weather, pick scene, apply; LaunchAgent installer
+  select                      match a poem to live conditions, apply; the poller
+  weather                     poller toggle + location; LaunchAgent installer
   toggle                      pause / resume
-  demo                        cycle the weather scenes
-  moon-demo                   cycle lunar phases
+  demo                        cycle the poem scenes
+  providers/                  input providers (weather, time, season, festival)
 shaders/
-  weather/                    the six weather scene shaders (.glsl)
   poems/                      animated classical-poem scenes (.glsl)
 collections/
-  weather.conf, poems.conf    per-collection manifest (description, strategy)
+  poems.conf                  per-collection manifest (description, budget, knobs)
+  poems.index.json            each scene's affinity tags (the matcher's scenes)
+  poems.rules.json            declarative when→boost/veto rules
+data/
+  festivals.json              festival dates (the 40-festival provider's source)
 web/
   index.html, gallery.js,     WebGL2 scene gallery (the GitHub Pages demo)
   style.css
@@ -41,6 +45,8 @@ web/
 scripts/
   scene-discovery.sh          shared scene lookup (one source of truth)
   ghostty-process.sh          shared Ghostty pid matcher + reload signal
+  match-rules.jq              the rule engine (facts × rules → per-scene score)
+  location-lib.sh             shared location resolution
   build-site.sh               assemble the gallery site (Pages + local preview)
   serve-site.sh               serve the exact Pages layout locally
   capture-assets.sh           regenerate assets/ via headless Chrome
@@ -80,8 +86,8 @@ CHANGELOG.md                  Keep a Changelog / semver history
 ## Adding a new scene
 
 1. **Write the shader.** Drop `shaders/<category>/<name>.glsl` (e.g.
-   `shaders/weather/` or `shaders/poems/`) following the conventions in the
-   existing scenes. Scene names are globally unique across categories:
+   `shaders/poems/`) following the conventions in the existing scenes. Scene
+   names are globally unique across categories:
 
    - Entry point: `void mainImage(out vec4 fragColor, in vec2 fragCoord)`.
    - Background-only. Sample `iChannel0` (the glyph layer) and composite at the
@@ -107,37 +113,39 @@ CHANGELOG.md                  Keep a Changelog / semver history
    - See `docs/scene-authoring.md` for the full uniform list, all baked
      defines, and performance guidance.
 
-2. **Pass the performance gate.** Every scene must stay under 5% of the
-   8.33 ms/frame budget at 3456×2234 / 120 Hz on an M1 Max:
+2. **Pass the performance gate.** Every scene must stay under its collection's
+   budget (poems: 75% of the 8.33 ms/frame budget at 3456×2234 / 120 Hz on an
+   M1 Max; the ceiling is `budget_pct` in `collections/<collection>.conf`):
 
    ```sh
    bench/run-bench.sh
    ```
 
-   The script exits non-zero and prints `OVER` for any scene above the
-   threshold. The benchmark is the oracle — if a scene fails, it needs
+   The script exits non-zero and prints `OVER` for any scene above its
+   collection's budget. The benchmark is the oracle — if a scene fails, it needs
    optimization before it can merge, not a raised threshold. The dominant cost
    driver is procedural noise (fbm) evaluated per pixel. The two levers that
    matter on Apple Silicon are: **gate** expensive noise to where it is
-   actually visible (see how `clear-night` evaluates its moon-surface fbm only
-   inside the disk, and how `cloudy` gates its fbm to the sky band), and
-   **reduce octave count / sample count**. A cheaper hash function does NOT
-   help on Apple Silicon — the GPU's `sin()` is fast and a polynomial hash
-   replacement measured slower in practice.
+   actually visible (compute fbm only inside the region that uses it — a disk, a
+   sky band — never across the whole screen and then masked), and **reduce
+   octave count / sample count**. A cheaper hash function does NOT help on Apple
+   Silicon — the GPU's `sin()` is fast and a polynomial hash replacement
+   measured slower in practice.
 
-3. **Wire it into the weather→scene mapping.** (Weather scenes only.) Add the
-   new scene name to the `pick_scene()` function in
-   `libexec/ghostty-shaders/weather`, mapping the appropriate WMO weather codes
-   to it. Keep the existing codes that already
-   point to the scene you're replacing (e.g., `fog.glsl` would claim codes
-   45 and 48 currently mapped to `cloudy`). Extend the mapping table in
-   `tests/run-tests.sh` to pin the new codes.
+3. **Make the matcher aware of it.** Add the scene's affinity tags to
+   `collections/poems.index.json` — the matcher only considers scenes listed
+   there, and the score is tag overlap against the live facts. If the scene
+   should respond to a *new* condition, add a `when → boost/veto` rule to
+   `collections/poems.rules.json`; the rule engine (`scripts/match-rules.jq`)
+   picks it up with no code change. If you also taught a provider a new fact,
+   pin it with an assertion in `tests/run-tests.sh`.
 
 4. **Test manually.**
 
    ```sh
    ghostty-shaders apply <name>          # apply it immediately
-   ghostty-shaders demo                 # cycle all scenes including the new one
+   ghostty-shaders select --print        # dry-run the matcher: see the pick + facts
+   ghostty-shaders demo                  # cycle all poem scenes including the new one
    ```
 
 5. **Record the golden reference.** CI fails any scene without a committed
@@ -180,9 +188,11 @@ shellcheck bin/ghostty-shaders libexec/ghostty-shaders/* \
   bench/*.sh scripts/*.sh tests/*.sh install.sh
 ```
 
-The decision logic (WMO→scene mapping, moon phase, `.env` parsing,
-day/night normalization) is unit-tested. The suite is dependency-free
-(plain bash + awk), runs on macOS and Linux, and must pass:
+The matcher's pure functions are unit-tested: the provider classifiers
+(`weather_class`, `time_phase`, `season_for`, `days_until`), the rule-engine
+scorer (`score_scenes`), the weighted-random pick (`sample_scene`), and config
+/`.env` parsing. The suite is dependency-free (plain bash + awk + jq), runs on
+macOS and Linux, and must pass:
 
 ```sh
 tests/run-tests.sh

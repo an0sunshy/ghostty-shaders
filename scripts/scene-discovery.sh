@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # scene-discovery.sh — the single source of truth for locating scene shaders.
 #
-# Scenes live under shaders/<category>/<name>.glsl (e.g. shaders/weather/rain.glsl,
-# shaders/poems/jing-ye-si.glsl). Scene names are GLOBALLY UNIQUE across
+# Scenes live under shaders/<category>/<name>.glsl
+# (e.g. shaders/poems/jing-ye-si.glsl). Scene names are GLOBALLY UNIQUE across
 # categories, so a bare name resolves to exactly one file regardless of which
 # collection it belongs to. Every consumer (the dispatcher, build-site, the
 # benchmarks, the gallery==scenes test) discovers scenes through these helpers
@@ -12,7 +12,7 @@
 #   source scripts/scene-discovery.sh
 #   scene_names  "$REPO/shaders"          # one name per line, sorted
 #   scene_files  "$REPO/shaders"          # one full path per line, sorted by name
-#   scene_path   "$REPO/shaders" rain     # full path for a name, or empty + rc 1
+#   scene_path   "$REPO/shaders" jing-ye-si  # full path for a name, or empty + rc 1
 #
 # This file only defines functions (no side effects), so it is safe to source
 # under `set -euo pipefail`.

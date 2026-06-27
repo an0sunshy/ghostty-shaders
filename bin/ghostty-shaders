@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
-# ghostty-shaders — weather- and poem-driven background shaders for the
-# Ghostty terminal. This is the single entry point; it dispatches to the
-# implementation modules under libexec/ghostty-shaders/.
+# ghostty-shaders — animated classical-poem background shaders for the
+# Ghostty terminal, auto-matched to live conditions. This is the single entry
+# point; it dispatches to the implementation modules under libexec/ghostty-shaders/.
 #
 # Subcommands:
 #   use <scene>              pin one scene and keep it (static selection)
 #   random [collection]      pin a random scene (from a collection, or any)
+#   select [--print]         match a poem to live conditions and apply it
 #   apply <scene>            apply one scene now without pinning it
 #   list [collection]        list collections, or one collection's scenes
 #   weather [on|off|set-city <name>]
-#                            weather mode: poll once, or enable/disable the poller
+#                            enable/disable the auto-match poller; set location
 #   toggle [--pause|--resume|--status]
 #                            pause / resume the active shader
-#   demo [secs]              cycle the weather scenes for a showcase
-#   moon-demo [secs]         cycle clear-night through the lunar phases
+#   demo [secs]              cycle the poem scenes for a showcase
 #
-# Scenes live in shaders/<collection>/<name>.glsl (e.g. shaders/weather/rain.glsl,
-# shaders/poems/jing-ye-si.glsl). Scene names are globally unique.
+# Scenes live in shaders/<collection>/<name>.glsl
+# (e.g. shaders/poems/jing-ye-si.glsl). Scene names are globally unique.
 #
-# Selection model: `use`/`random` pin a scene (the cron weather poller then
-# stands down so it isn't clobbered); `weather`/`weather on` return to
-# weather mode. Per-new-window random rotation is documented but not yet
-# wired — see docs/random-per-window.md.
+# Selection model: the poller (`weather on`) auto-matches a poem to live
+# conditions every 5 min; `use`/`random` pin a scene so the poller stands
+# down and isn't clobbered; `select` runs one match on demand. See
+# docs/random-per-window.md for the planned per-window rotation.
 
 set -euo pipefail
 
@@ -45,7 +45,7 @@ SELECTION_FILE="$HOME/.config/ghostty-shaders/selection"
 . "$REPO_DIR/scripts/scene-discovery.sh"
 
 usage() {
-    sed -n '2,23{s/^# \?//;p;}' "$0" >&2
+    sed -n '2,24{s/^# \?//;p;}' "$0" >&2
     exit "${1:-1}"
 }
 
@@ -132,19 +132,20 @@ if [ "$#" -gt 0 ]; then shift; fi
 case "$cmd" in
     use)       cmd_use "$@" ;;
     random)    cmd_random "$@" ;;
+    select)    exec "$LIBEXEC/select" "$@" ;;
     apply)     exec "$LIBEXEC/apply" "$@" ;;
     toggle)    exec "$LIBEXEC/toggle" "$@" ;;
     demo)      exec "$LIBEXEC/demo" "$@" ;;
-    moon-demo) exec "$LIBEXEC/moon-demo" "$@" ;;
     list)      cmd_list "$@" ;;
     weather)
         case "${1:-}" in
-            # `weather on` returns to weather mode: drop any static pin, then
-            # install the cron poller.
+            # `weather on` returns to auto mode: drop any static pin, then
+            # install the cron poller (which runs the `select` matcher).
             on)            rm -f "$SELECTION_FILE"; exec "$LIBEXEC/weather" --install ;;
             off)           exec "$LIBEXEC/weather" --uninstall ;;
             set-city)      shift; exec "$LIBEXEC/weather" --set-city "$@" ;;
-            ""|once)       exec "$LIBEXEC/weather" ;;
+            once)          exec "$LIBEXEC/select" ;;     # one-shot match now
+            "")            exec "$LIBEXEC/weather" ;;     # bare → usage
             *) echo "usage: ghostty-shaders weather [on|off|set-city <name>]" >&2; exit 1 ;;
         esac ;;
     -h|--help|help) usage 0 ;;

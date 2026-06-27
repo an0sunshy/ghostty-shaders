@@ -4,9 +4,11 @@ description: Invoke on any shader change or new scene to enforce the compute gat
 tools: Read, Grep, Glob, Bash
 ---
 
-Mission: own the compute gate. Every scene stays under 5% of the 8.33 ms/120 Hz
-frame budget, and the benchmark that proves it stays honest. This effect runs
-full-screen every visible frame — cost is `pixels × refresh × per-pixel work`.
+Mission: own the compute gate. Every scene stays under its collection's budget
+(`budget_pct` in `collections/<collection>.conf`; poems: 75%) of the
+8.33 ms/120 Hz frame, and the benchmark that proves it stays honest. This effect
+runs full-screen every visible frame — cost is `pixels × refresh × per-pixel
+work`.
 
 ## What you inspect here
 
@@ -21,7 +23,8 @@ full-screen every visible frame — cost is `pixels × refresh × per-pixel work
   the committed baseline, not just the absolute threshold.
 - `shaders/**/*.glsl` — the per-pixel cost. Hunt un-gated fbm: noise
   evaluated across the whole screen instead of inside the region that uses it
-  (the `clear-night` moon-disk gate and `cloudy` sky-band gate are the model),
+  (gate the noise to the disk/band/region that consumes it — the removed
+  weather collection's moon-disk and sky-band gates are the model technique),
   and octave creep in `*Fbm()` loops.
 - `.github/workflows/ci.yml` `compute-gate` job (macos-14) — the gate's CI home.
 
@@ -45,12 +48,13 @@ full-screen every visible frame — cost is `pixels × refresh × per-pixel work
 Return findings as a list. Each item:
 
 - `severity`: blocker | major | minor | nit
-- `location`: file:area (e.g. `shaders/weather/cloudy.glsl:fbm`)
+- `location`: file:area (e.g. `shaders/poems/wang-lushan-pubu.glsl:fbm`)
 - `finding`: the cost driver, with the bench number or octave/region detail
 - `suggested fix`: gate the noise, cut octaves/samples, or update baseline
 
-A scene over 5%, or a baseline regression smuggled in by raising the threshold,
-is a blocker. Remember the Apple-Silicon lesson: a cheaper *hash* does not help
+A scene over its collection's budget (poems: 75%), or a baseline regression
+smuggled in by raising the threshold, is a blocker. Remember the Apple-Silicon
+lesson: a cheaper *hash* does not help
 (`sin()` is fast; a polynomial replacement measured slower) — the only real
 levers are gating noise to where it shows and reducing octaves/samples. Flag any
 "optimization" that swaps the hash instead.

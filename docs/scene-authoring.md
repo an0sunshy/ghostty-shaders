@@ -1,12 +1,12 @@
 # Scene authoring guide
 
-This document covers everything you need to write a new weather scene for
+This document covers everything you need to write a new scene for
 ghostty-shaders: the shader contract Ghostty expects, the baked defines the
 swap pipeline injects, performance discipline, and the steps to finish a scene
 and get it merged.
 
-For the mechanical steps — where to put the file, how to wire it into the
-weather→scene mapping, what checks to run before opening a PR — see
+For the mechanical steps — where to put the file, how to make the matcher aware
+of it, what checks to run before opening a PR — see
 [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ---
@@ -57,7 +57,7 @@ vec3 outRgb = (iBackgroundColor + effect) * (1.0 - term.a) + term.rgb;
 fragColor = vec4(outRgb, 1.0);
 ```
 
-`effect` is the additive weather contribution your shader computes — color
+`effect` is the additive contribution your shader computes — color
 deltas on top of the background, not a replacement for it. Where `term.a` is
 1.0 (opaque glyph), the background is completely suppressed; where it is 0.0
 (empty cell), your effect shows through at full strength.
@@ -151,8 +151,8 @@ of day, lunar phase) without requiring Ghostty to expose date/clock uniforms.
 
 | Define | Type | Range / values | Notes |
 |---|---|---|---|
-| `MOON_PHASE` | `float` | [0, 1) | 0 = new, 0.25 = first quarter, 0.5 = full, 0.75 = last quarter. Computed from the synodic cycle (29.53 days) at swap time. Used by `clear-night`. |
-| `IS_DAY` | `float` | 0.0 or 1.0 | Open-Meteo's `is_day` flag. 1.0 = daytime, 0.0 = night. Used for lighting decisions in `cloudy` and others. |
+| `MOON_PHASE` | `float` | [0, 1) | 0 = new, 0.25 = first quarter, 0.5 = full, 0.75 = last quarter. Computed from the synodic cycle (29.53 days) at swap time. Legacy host define from the weather era — still baked, but no current poem scene reads it. |
+| `IS_DAY` | `float` | 0.0 or 1.0 | Open-Meteo's `is_day` flag. 1.0 = daytime, 0.0 = night. Legacy host define from the weather era — still baked, but no current poem scene reads it. |
 | `TIME_OF_DAY_BASE` | `float` | seconds since midnight | Local solar time at swap time, as a float. Can drive color temperature shifts or gradual sky transitions. |
 
 Guard every define you consume with `#ifndef` so the scene compiles
@@ -181,9 +181,10 @@ are harmless noise.
 
 These shaders run as a full-screen fragment pass every frame the terminal is
 visible. Cost scales with `pixels × refresh × per-pixel work`. At 3456×2234
-and 120 Hz, the per-frame budget is 8.33 ms; every scene must stay under 5%
-of that (≈ 0.42 ms) on an M1 Max. The benchmark is the oracle — a scene that
-fails the gate needs optimization, not a raised threshold.
+and 120 Hz, the per-frame budget is 8.33 ms; every scene must stay under its
+collection's budget on an M1 Max — the `budget_pct` in
+`collections/<collection>.conf` (poems: 75%, ≈ 6.25 ms). The benchmark is the
+oracle — a scene that fails the gate needs optimization, not a raised threshold.
 
 ### The dominant cost driver: procedural noise
 
@@ -195,9 +196,12 @@ that matter on Apple Silicon:
 **1. Gate expensive noise to where it is actually visible.**
 
 Do not compute fbm for every fragment and then multiply by zero outside the
-region of interest. Branch early and skip the work entirely.
+region of interest. Branch early and skip the work entirely. The two clearest
+worked examples come from the original weather collection (since removed); the
+technique transfers unchanged to any scene with a localized bright element.
 
-`clear-night` gates its 3-octave moon-surface fbm to inside the moon disk:
+When the expensive detail lives inside a disk — a moon, a lantern, a sun —
+gate the fbm to inside it:
 
 ```glsl
 if (r < 1.05) {
@@ -206,22 +210,23 @@ if (r < 1.05) {
 }
 ```
 
-The moon disk covers less than 1% of the screen, so entire GPU warps outside
-the disk skip the fbm uniformly. This cut the scene's cost from 23% to 3.6% —
-a 6× reduction with zero visual change.
+If the disk covers less than 1% of the screen, entire GPU warps outside it skip
+the fbm uniformly. In the removed clear-night scene this cut cost from 23% to
+3.6% — a 6× reduction with zero visual change.
 
-`cloudy` gates its 2-octave fbm to the sky band where clouds appear:
+When the detail lives in a horizontal band — a cloud layer, a haze, a far
+shore — gate the fbm to that band:
 
 ```glsl
 float vbias = smoothstep(0.95, 0.55, uv.y) * smoothstep(0.30, 0.55, uv.y);
 
 if (vbias > 0.0) {
-    // all cloud fbm inside this block
+    // all band fbm inside this block
 }
 ```
 
-The bottom ~30% and top ~5% of the screen are unconditionally zero and skip
-all cloud work. This cut the scene from 18% to 4.6%.
+The fragments above and below the band are unconditionally zero and skip all of
+its work. In the removed cloudy scene this cut cost from 18% to 4.6%.
 
 **2. Reduce octave count.**
 
@@ -259,17 +264,17 @@ Apply the scene to a running Ghostty instance immediately:
 ghostty-shaders apply <name>
 ```
 
-Cycle all scenes in sequence (10 seconds each by default):
+Cycle all poem scenes in sequence (10 seconds each by default):
 
 ```sh
 ghostty-shaders demo [seconds]
 ```
 
-If your scene is `clear-night` or uses `MOON_PHASE`, preview all eight
-synthesized lunar phases:
+To see what the matcher would pick for the current conditions without applying
+it, dry-run the selection engine:
 
 ```sh
-ghostty-shaders moon-demo [seconds]
+ghostty-shaders select --print
 ```
 
 ---

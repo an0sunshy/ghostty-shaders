@@ -1,0 +1,32 @@
+{
+  "_note": "Declarative rule engine for scene matching. A rule fires when EVERY condition in `when` matches the merged facts (scalar = equals; array = membership; object = operator {\"<=\"|\">=\"|\"<\"|\">\"|\"ne\": n}). A fired rule's `boost` adds weight to tags (scenes carrying those tags score higher); `veto` removes any scene carrying those tags from candidacy. Conditions on an absent fact never match, so offline/partial facts simply fire fewer rules. Every tag named here must exist in collections/poems.index.json (enforced by tests). Tune weights freely; this file is data, not code.",
+  "rules": [
+    { "id": "wx-clear",  "when": { "weather": "clear" }, "boost": { "clear": 3 } },
+    { "id": "wx-rain",   "when": { "weather": "rain" },  "boost": { "rain": 3 } },
+    { "id": "wx-snow",   "when": { "weather": "snow" },  "boost": { "snow": 3, "winter": 1 } },
+    { "id": "wx-cloud",  "when": { "weather": "cloud" }, "boost": { "cloud": 3 } },
+    { "id": "wx-fog",    "when": { "weather": "fog" },   "boost": { "fog": 3, "cloud": 1 } },
+    { "id": "wx-storm",  "when": { "weather": "storm" }, "boost": { "storm": 3, "wind": 1 } },
+
+    { "id": "time-dawn",  "when": { "phase": "dawn" },  "boost": { "dawn": 2 } },
+    { "id": "time-day",   "when": { "phase": "day" },   "boost": { "day": 2 } },
+    { "id": "time-dusk",  "when": { "phase": "dusk" },  "boost": { "dusk": 2 } },
+    { "id": "time-night", "when": { "phase": "night" }, "boost": { "night": 2, "moon": 1 } },
+
+    { "id": "season-spring", "when": { "season": "spring" }, "boost": { "spring": 2 } },
+    { "id": "season-summer", "when": { "season": "summer" }, "boost": { "summer": 2 } },
+    { "id": "season-autumn", "when": { "season": "autumn" }, "boost": { "autumn": 2 } },
+    { "id": "season-winter", "when": { "season": "winter" }, "boost": { "winter": 2 } },
+
+    { "id": "festival-mid-autumn",     "when": { "festival": "mid-autumn",     "days_to_festival": { "<=": 3 } }, "boost": { "moon": 5, "mid-autumn": 8 } },
+    { "id": "festival-double-ninth",   "when": { "festival": "double-ninth",   "days_to_festival": { "<=": 3 } }, "boost": { "mountain": 4, "double-ninth": 8 } },
+    { "id": "festival-double-seventh", "when": { "festival": "double-seventh", "days_to_festival": { "<=": 3 } }, "boost": { "night": 3, "moon": 2, "double-seventh": 8 } },
+    { "id": "festival-qingming",       "when": { "festival": "qingming",       "days_to_festival": { "<=": 3 } }, "boost": { "rain": 4, "spring": 2 } },
+
+    { "id": "cold-snap",   "when": { "temp_c": { "<=": 0 } },  "boost": { "snow": 1, "winter": 1 } },
+    { "id": "warm-summer", "when": { "temp_c": { ">=": 25 } }, "boost": { "summer": 1 } },
+    { "id": "breezy",      "when": { "wind":   { ">=": 30 } }, "boost": { "wind": 1 } },
+
+    { "id": "veto-snow-when-warm", "when": { "temp_c": { ">=": 18 } }, "veto": ["snow"] }
+  ]
+}

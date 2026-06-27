@@ -1,41 +1,24 @@
 #!/usr/bin/env bash
-# ghostty-shaders weather — fetch current local weather, pick the matching
-# scene, and invoke the `apply` subcommand. Designed to run from a launchd
-# LaunchAgent every 5 minutes; also fine to invoke manually for testing.
-# (The `weather` subcommand; the user-facing entry point is bin/ghostty-shaders.)
+# ghostty-shaders weather — manage the 5-minute background poller and the
+# user's location. The poller itself is `select`, which matches a poem scene
+# to live conditions (weather, time of day, season, festival proximity) and
+# hot-reloads Ghostty. This script installs/removes that LaunchAgent and owns
+# location configuration; it no longer renders weather scenes.
 #
-# Location is read from one of two files (priority order):
-#   1. ~/.config/ghostty-shaders/config.env — user-editable, .env format.
-#      Set ONE of:
-#        LAT=47.6062
-#        LON=-122.3321
-#      ... or:
-#        LOCATION=98101          (US ZIP)
-#        LOCATION="Seattle, WA"  (city name)
-#      Direct LAT/LON never call any 3P. LOCATION is geocoded ONCE via
-#      Open-Meteo's free /v1/search endpoint and cached in location.json
-#      so subsequent polls reuse the result (no recurring location leak).
-#   2. ~/.config/ghostty-shaders/location.json — the geocoded cache,
-#      also writable directly by `--set-city`. Format:
-#        {"lat":..., "lon":..., "city":..., "source":...}
-# If neither has a usable value, falls back to NYC with a warning.
+# Location is read by the shared location lib (scripts/location-lib.sh) from:
+#   1. ~/.config/ghostty-shaders/config.env — LAT/LON (no 3P call) or LOCATION
+#      (a city / US ZIP geocoded ONCE via Open-Meteo and cached).
+#   2. ~/.config/ghostty-shaders/location.json — the geocoded cache, also
+#      written by `set-city`.
+# If neither has a usable value, the poller falls back to NYC with a warning.
 #
-# Weather data: Open-Meteo current_weather endpoint. Free, no key, 10K
-# calls/day per IP (we use ~288/day at 5-min cadence).
+# Subcommands (via bin/ghostty-shaders):
+#   weather on               install the LaunchAgent (5-min interval)
+#   weather off              remove the LaunchAgent
+#   weather set-city <name>  geocode a city/ZIP and cache it
 #
-# Scene mapping: WMO weather codes → the 6 weather scenes. Matches the HTML
-# preview demo's WEATHER_MAP exactly so what users picked there is what they
-# get here. Day/night branching uses Open-Meteo's `is_day` flag.
-#
-# Failure modes:
-#   - Network failure: use cached response if < 6h old, else fall back
-#     to a local-clock clear-day/clear-night based on hour.
-#   - No location set: use FALLBACK_LAT/FALLBACK_LON and log a warning so
-#     the user knows to configure.
-#
-# Self-install: `ghostty-shaders weather on` generates a launchd plist
-# pointing at this script, loads it, and sets the 5-min interval.
-# `ghostty-shaders weather off` reverses it.
+# Self-install: `weather on` generates a launchd plist that runs `select
+# --cron`; `weather off` reverses it.
 
 set -euo pipefail
 
@@ -48,206 +31,32 @@ while [ -L "$SOURCE" ]; do
     [ "${SOURCE#/}" = "$SOURCE" ] && SOURCE="$DIR/$SOURCE"
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
-SCRIPT="$SCRIPT_DIR/$(basename "$SOURCE")"
-APPLY="$SCRIPT_DIR/apply"
-TOGGLE="$SCRIPT_DIR/toggle"
+REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 CACHE_DIR="$HOME/Library/Caches/ghostty-shaders"
-CACHE_FILE="$CACHE_DIR/cache.json"
 LOG_DIR="$HOME/Library/Logs"
 LOG_FILE="$LOG_DIR/ghostty-shaders-poll.log"
+
+# Location paths (defined here so they read clearly; the sourced lib honors
+# pre-set values via `: "${VAR:=…}"`, so there is still one source of truth).
 LOC_DIR="$HOME/.config/ghostty-shaders"
 LOC_FILE="$LOC_DIR/location.json"
 ENV_FILE="$LOC_DIR/config.env"
 
 PLIST_LABEL="dev.ghostty-shaders.poll"
 PLIST_FILE="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
+POLL_INTERVAL="${GHOSTTY_SHADERS_POLL_INTERVAL:-300}"   # 5 min; override at `weather on`
 
-# Fallback location used only if the user hasn't set location.json. NYC
-# coords — chosen for visibility (any common timezone would do). User
-# should override by writing $LOC_FILE.
-FALLBACK_LAT="40.7128"
-FALLBACK_LON="-74.0060"
-
-CACHE_MAX_STALE=$((6 * 3600))    # 6 hours
-POLL_INTERVAL="${GHOSTTY_SHADERS_POLL_INTERVAL:-300}"   # 5 min default; override via env at `weather on`
-# Cap the log so a 5-min cadence can't grow it without bound. Mirrors the
-# 256k self-rotation in lifesupport's scripts/sync.sh for consistency.
-LOG_MAX_BYTES="${GHOSTTY_SHADERS_LOG_MAX:-262144}"   # 256k
-
-# Marker files shared with the toggle subcommand. If the user manually
-# pauses or resumes, the poller respects that and won't fight it.
-PAUSE_MARKER="$CACHE_DIR/paused"
-BATTERY_PAUSE_MARKER="$CACHE_DIR/paused-by-battery"
-MANUAL_RESUME_MARKER="$CACHE_DIR/manual-resume-override"
-
-# Static-selection marker, written by `ghostty-shaders use`/`random`. When
-# present the user has pinned a specific scene, so the 5-min cron poller
-# stands down (like a pause). A manual `ghostty-shaders weather` clears it
-# (an explicit "give me weather now" = back to weather mode).
-SELECTION_FILE="$LOC_DIR/selection"
-
-# ---------------------------------------------------------------- helpers
-
-# Diagnostics go to stderr: several callers are command-substituted (e.g.
-# SCENE=$(pick_scene ...)), and a stdout log line there would be captured
-# into the result. launchd merges both streams into the same log file, so
-# nothing changes for the LaunchAgent.
 log() { printf '%s ghostty-shaders weather: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
 
-# Self-rotate the log: keep the last $LOG_MAX_BYTES bytes, in place. Truncates
-# at process EXIT (via trap) so it never races with the launchd-held stdout
-# fd — by exit time all our writes are done, and launchd reopens the path on
-# the next run. Keeping the same file (tail → tmp → mv) means we never break
-# the StandardOutPath the plist points at. No-op if the file is under the cap.
-# Portable: tail -c + wc -c only (no truncate(1), absent on stock macOS).
-truncate_log() {
-    [ -f "$LOG_FILE" ] || return 0
-    local size
-    size=$(wc -c <"$LOG_FILE" 2>/dev/null || echo 0)
-    if [ "$size" -gt "$LOG_MAX_BYTES" ]; then
-        tail -c "$LOG_MAX_BYTES" "$LOG_FILE" >"$LOG_FILE.tmp" 2>/dev/null \
-            && mv "$LOG_FILE.tmp" "$LOG_FILE"
-    fi
-}
-
-# Map WMO weather_code + is_day to one of our 6 scene names. Mirrors the
-# HTML preview's WEATHER_MAP. Unknown codes fall back to clear by time.
-pick_scene() {
-    local code="$1" is_day="$2"
-    case "$code" in
-        0|1)  if [[ $is_day == 1 ]]; then echo clear-day; else echo clear-night; fi ;;
-        2|3)  echo cloudy ;;
-        45|48) echo cloudy ;;   # fog → cloudy (until we author fog.glsl)
-        51|53|55|56|57|61|63|65|66|67|80|81|82) echo rain ;;
-        71|73|75|77|85|86) echo snow ;;
-        95|96|99) echo thunderstorm ;;
-        *)
-            log "unknown weather_code=$code, defaulting by hour"
-            if [[ $is_day == 1 ]]; then echo clear-day; else echo clear-night; fi
-            ;;
-    esac
-}
-
-# Pick a scene from time of day alone — used when offline + no cache.
-# Hour is an explicit zero-padded "HH" argument: keeps the function pure
-# (directly unit-testable) and keeps shellcheck's SC2120 quiet.
-scene_by_hour() {
-    local h="$1"
-    if (( 10#$h >= 6 && 10#$h < 18 )); then echo clear-day; else echo clear-night; fi
-}
-
-# Extract a KEY=value pair from an .env-style file. Tolerates surrounding
-# whitespace, optional `export `, single/double quotes around the value,
-# and trailing comments. Won't execute the file (no `source`) so we don't
-# treat user config as code.
-read_env_var() {
-    local key="$1" file="$2"
-    [[ -f $file ]] || return 1
-    sed -nE "s/^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*=[[:space:]]*\"?([^\"#]+)\"?[[:space:]]*(#.*)?\$/\2/p" "$file" \
-        | head -1 \
-        | sed -E 's/[[:space:]]+$//'
-}
-
-read_json_lat_lon() {
-    local file="$1"
-    [[ -f $file ]] || return 1
-    if command -v jq >/dev/null 2>&1; then
-        LAT=$(jq -r '.lat // empty' "$file")
-        LON=$(jq -r '.lon // empty' "$file")
-    else
-        LAT=$(grep -oE '"lat"[[:space:]]*:[[:space:]]*-?[0-9.]+' "$file" | grep -oE '\-?[0-9.]+$')
-        LON=$(grep -oE '"lon"[[:space:]]*:[[:space:]]*-?[0-9.]+' "$file" | grep -oE '\-?[0-9.]+$')
-    fi
-    [[ -n $LAT && -n $LON && $LAT != "null" && $LON != "null" ]]
-}
-
-# Geocode a city name or US ZIP via Open-Meteo's /v1/search. Writes a
-# fresh location.json and sets LAT/LON plus GEO_NAME (the resolved
-# "City, Admin Country" with jq, or the raw query without). Caller decides
-# when to call (we only do it on first-use or when ENV_LOCATION changes).
-geocode_to_cache() {
-    local query="$1"
-    log "geocoding '$query' once via Open-Meteo, caching to $LOC_FILE"
-    local geo
-    geo=$(curl -sf -m 10 -G \
-              --data-urlencode "name=$query" \
-              --data-urlencode 'count=1' \
-              --data-urlencode 'format=json' \
-              'https://geocoding-api.open-meteo.com/v1/search' || true)
-    local name
-    if command -v jq >/dev/null 2>&1; then
-        LAT=$(jq -r '.results[0].latitude // empty'  <<<"$geo")
-        LON=$(jq -r '.results[0].longitude // empty' <<<"$geo")
-        name=$(jq -r '.results[0] | "\(.name), \(.admin1 // "") \(.country // "")"' <<<"$geo" 2>/dev/null)
-    else
-        LAT=$(echo "$geo" | grep -oE '"latitude"[[:space:]]*:[[:space:]]*-?[0-9.]+' | head -1 | grep -oE '\-?[0-9.]+$')
-        LON=$(echo "$geo" | grep -oE '"longitude"[[:space:]]*:[[:space:]]*-?[0-9.]+' | head -1 | grep -oE '\-?[0-9.]+$')
-        name=$query
-    fi
-    if [[ -z $LAT || -z $LON ]]; then
-        log "geocoding failed for '$query' (no match)"
-        return 1
-    fi
-    mkdir -p "$LOC_DIR"
-    GEO_NAME=$name
-    printf '{"lat": %s, "lon": %s, "city": "%s", "source": "%s"}\n' "$LAT" "$LON" "$name" "$query" > "$LOC_FILE"
-}
-
-read_location() {
-    # Priority 1: explicit LAT + LON in config.env (zero 3P calls for location).
-    local env_lat env_lon env_loc
-    env_lat=$(read_env_var LAT      "$ENV_FILE" || true)
-    env_lon=$(read_env_var LON      "$ENV_FILE" || true)
-    env_loc=$(read_env_var LOCATION "$ENV_FILE" || true)
-    if [[ -n $env_lat && -n $env_lon ]]; then
-        LAT=$env_lat; LON=$env_lon
-        return 0
-    fi
-
-    # Priority 2: LOCATION in config.env, geocoded once + cached.
-    # Re-geocode only if the user's LOCATION value changed since the cache
-    # was written (compare against location.json's `source` field).
-    if [[ -n $env_loc ]]; then
-        local cached_source=""
-        if [[ -f $LOC_FILE ]] && command -v jq >/dev/null 2>&1; then
-            cached_source=$(jq -r '.source // empty' "$LOC_FILE")
-        elif [[ -f $LOC_FILE ]]; then
-            cached_source=$(grep -oE '"source"[[:space:]]*:[[:space:]]*"[^"]*"' "$LOC_FILE" | sed -E 's/.*"([^"]*)"$/\1/')
-        fi
-        if [[ $cached_source == "$env_loc" ]] && read_json_lat_lon "$LOC_FILE"; then
-            return 0
-        fi
-        if geocode_to_cache "$env_loc" && read_json_lat_lon "$LOC_FILE"; then
-            return 0
-        fi
-    fi
-
-    # Priority 3: existing location.json (set by --set-city or manually).
-    if read_json_lat_lon "$LOC_FILE"; then
-        return 0
-    fi
-
-    log "WARN: no location configured. Edit $ENV_FILE (LAT/LON or LOCATION) or run --set-city. Using fallback ($FALLBACK_LAT, $FALLBACK_LON)."
-    LAT=$FALLBACK_LAT; LON=$FALLBACK_LON
-}
-
-# True if the user has actually configured a location (direct LAT+LON, a
-# LOCATION to geocode, or a cached location.json). Lets --install warn loudly
-# when the poller would otherwise silently fall back to NYC. Read-only:
-# read_json_lat_lon runs in a subshell so it can't clobber the LAT/LON globals.
-location_is_set() {
-    local lat lon loc
-    lat=$(read_env_var LAT      "$ENV_FILE" 2>/dev/null || true)
-    lon=$(read_env_var LON      "$ENV_FILE" 2>/dev/null || true)
-    loc=$(read_env_var LOCATION "$ENV_FILE" 2>/dev/null || true)
-    [[ -n $lat && -n $lon ]] && return 0
-    [[ -n $loc ]] && return 0
-    ( read_json_lat_lon "$LOC_FILE" ) >/dev/null 2>&1
-}
+# Location resolution + geocoding live in the shared lib (the same one the
+# weather provider and select use), so there is one source of truth. It also
+# defines LOC_DIR / LOC_FILE / ENV_FILE / FALLBACK_LAT / FALLBACK_LON.
+# shellcheck source=../../scripts/location-lib.sh disable=SC1091
+. "$REPO_DIR/scripts/location-lib.sh"
 
 # When sourced (by tests/run-tests.sh) stop here: everything above is
-# definitions without side effects; everything below acts on the system.
+# definitions; everything below acts on the system.
 if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
     return 0
 fi
@@ -256,6 +65,8 @@ fi
 
 if [[ "${1:-}" == "--install" ]]; then
     mkdir -p "$(dirname "$PLIST_FILE")" "$LOG_DIR" "$LOC_DIR" "$CACHE_DIR"
+    # The LaunchAgent drives the `select` matcher (poem chosen from live
+    # conditions). `weather on/off` remains the poller toggle and owns location.
     cat > "$PLIST_FILE" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -265,7 +76,7 @@ if [[ "${1:-}" == "--install" ]]; then
     <string>$PLIST_LABEL</string>
     <key>ProgramArguments</key>
     <array>
-        <string>$SCRIPT</string>
+        <string>$SCRIPT_DIR/select</string>
         <string>--cron</string>
     </array>
     <key>StartInterval</key>
@@ -289,7 +100,7 @@ EOF
     # and how to set their location.
     if [[ ! -f $ENV_FILE && ! -f $LOC_FILE ]]; then
         cat > "$ENV_FILE" <<'EOF'
-# ghostty-shaders weather location config. Set ONE of the following.
+# ghostty-shaders location config. Set ONE of the following.
 #
 # Direct coordinates (recommended — never calls a 3P API for location):
 # LAT=47.6062
@@ -304,8 +115,6 @@ EOF
     fi
 
     # Surface the silent-NYC-fallback at the one moment a human is watching.
-    # The poller's own warning goes to the log file under launchd, which the
-    # user never sees; this notice is right here in the install output.
     if ! location_is_set; then
         printf '\n⚠  No location set — the poller will use New York City\n'
         printf '   (%s, %s) until you set yours:\n' "$FALLBACK_LAT" "$FALLBACK_LON"
@@ -325,7 +134,7 @@ fi
 if [[ "${1:-}" == "--set-city" ]]; then
     CITY="${2:-}"
     [[ -n $CITY ]] || { echo "usage: $0 --set-city <city name>" >&2; exit 1; }
-    # Reuse the poller's geocoder (Open-Meteo /v1/search — no key, no IP guess);
+    # Reuse the shared geocoder (Open-Meteo /v1/search — no key, no IP guess);
     # it writes location.json and sets LAT/LON/GEO_NAME.
     if geocode_to_cache "$CITY"; then
         echo "set location: ${GEO_NAME:-$CITY} ($LAT, $LON) → $LOC_FILE"
@@ -336,118 +145,15 @@ if [[ "${1:-}" == "--set-city" ]]; then
     exit 0
 fi
 
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-    sed -n 's/^# \?//; 1,/^$/p' "$0" | head -40
-    echo
-    echo "  ghostty-shaders weather                  poll once and apply"
-    echo "  ghostty-shaders weather set-city <name>  geocode + save location"
-    echo "  ghostty-shaders weather on               install LaunchAgent (5-min interval)"
-    echo "  ghostty-shaders weather off              remove the LaunchAgent"
-    echo
-    echo "Location config: $ENV_FILE"
-    echo "  LAT=...  LON=...     direct coords, no 3P geocoding call"
-    echo "  LOCATION=98101       city or US ZIP, geocoded ONCE and cached"
-    exit 0
-fi
-
-# ---------------------------------------------------------------- main
-
-mkdir -p "$CACHE_DIR" "$LOG_DIR" "$LOC_DIR"
-
-# Cap the log at exit of every poll run (not the --install/--help subcommands
-# above, which already exited). Runs on all exit paths, including the early
-# `exit 0` returns in the battery/pause branches below.
-trap truncate_log EXIT
-
-# Static-selection awareness. The cron poller (`--cron`, run by the LaunchAgent)
-# stands down when the user has pinned a scene via `ghostty-shaders use`/`random`
-# — its static pick must not be clobbered every 5 minutes. A manual poll has no
-# `--cron`, so it clears the marker first: running `ghostty-shaders weather` is
-# an explicit request to return to weather mode.
-if [[ "${1:-}" == "--cron" ]]; then
-    if [[ -f $SELECTION_FILE ]]; then
-        log "static selection active ($(cat "$SELECTION_FILE" 2>/dev/null)); skipping weather swap"
-        exit 0
-    fi
-else
-    rm -f "$SELECTION_FILE"
-fi
-
-# Battery awareness: opt-in via PAUSE_ON_BATTERY=true in config.env.
-# When on battery, pause the shader entirely (matches manual --pause via
-# the toggle subcommand). On AC, resume IF we were the one who paused
-# (so manual pauses by the user persist across power transitions).
-pause_on_batt=$(read_env_var PAUSE_ON_BATTERY "$ENV_FILE" || true)
-# macOS ships bash 3.2; no ${var,,} lowercasing. tr instead.
-pause_on_batt=$(printf '%s' "$pause_on_batt" | tr '[:upper:]' '[:lower:]')
-if [[ $pause_on_batt == "true" ]]; then
-    power_source=$(pmset -g batt 2>/dev/null | head -1)
-    if [[ $power_source == *"Battery Power"* ]]; then
-        # User-initiated --resume overrides battery automation until next
-        # AC transition. Without this, --resume on battery just races
-        # against the next poll and re-pauses immediately.
-        if [[ -f $MANUAL_RESUME_MARKER ]]; then
-            log "on battery but manual-resume override is active; proceeding"
-        elif [[ ! -f $PAUSE_MARKER ]]; then
-            log "on battery + PAUSE_ON_BATTERY=true → pausing shader"
-            "$TOGGLE" --pause >/dev/null
-            touch "$BATTERY_PAUSE_MARKER"
-            exit 0
-        else
-            exit 0   # already paused (by us or by user); nothing to do
-        fi
-    else
-        # On AC. Clear the manual-resume override (its job is done) and
-        # the battery-pause marker. If we were the one who paused, also
-        # clear the pause and let the normal flow below do the fresh swap.
-        # Honor a manual user pause (PAUSE_MARKER without our battery
-        # marker) by NOT clearing it.
-        rm -f "$MANUAL_RESUME_MARKER"
-        if [[ -f $BATTERY_PAUSE_MARKER && -f $PAUSE_MARKER ]]; then
-            log "on AC + battery-pause marker → clearing pause and refreshing scene"
-            rm -f "$BATTERY_PAUSE_MARKER" "$PAUSE_MARKER"
-        fi
-    fi
-fi
-
-# Respect a manual pause (set by the toggle subcommand). Just no-op.
-if [[ -f $PAUSE_MARKER ]]; then
-    log "shader is paused (marker present); skipping swap"
-    exit 0
-fi
-
-read_location
-
-URL="https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current_weather=true&timezone=auto"
-
-RESPONSE=$(curl -sf -m 10 "$URL" || true)
-
-if [[ -z $RESPONSE ]]; then
-    log "weather fetch failed (offline?)"
-    if [[ -f $CACHE_FILE ]] && (( $(date +%s) - $(stat -f %m "$CACHE_FILE") < CACHE_MAX_STALE )); then
-        log "  using cached response (< ${CACHE_MAX_STALE}s old)"
-        RESPONSE=$(cat "$CACHE_FILE")
-    else
-        SCENE=$(scene_by_hour "$(date +%H)")
-        log "  no fresh cache → fallback to '$SCENE' (by local hour)"
-        "$APPLY" "$SCENE"
-        exit 0
-    fi
-fi
-
-echo "$RESPONSE" > "$CACHE_FILE"
-
-if command -v jq >/dev/null 2>&1; then
-    CODE=$(echo "$RESPONSE" | jq -r '.current_weather.weathercode')
-    IS_DAY=$(echo "$RESPONSE" | jq -r '.current_weather.is_day')
-    TEMP=$(echo "$RESPONSE" | jq -r '.current_weather.temperature')
-else
-    CODE=$(echo "$RESPONSE" | grep -oE '"weathercode"\s*:\s*[0-9]+' | grep -oE '[0-9]+$')
-    IS_DAY=$(echo "$RESPONSE" | grep -oE '"is_day"\s*:\s*[0-9]+' | grep -oE '[0-9]+$')
-    TEMP=$(echo "$RESPONSE" | grep -oE '"temperature"\s*:\s*-?[0-9.]+' | grep -oE '\-?[0-9.]+$')
-fi
-
-SCENE=$(pick_scene "$CODE" "$IS_DAY")
-log "weather_code=$CODE is_day=$IS_DAY temp=${TEMP}°C → $SCENE"
-# Pass the API's real is_day to apply so weather scenes dim at night.
-GHOSTTY_SHADERS_IS_DAY="$IS_DAY" "$APPLY" "$SCENE"
+# --help / bare / unknown: show usage.
+sed -n 's/^# \?//; 1,/^$/p' "$0" | head -24
+echo
+echo "  ghostty-shaders weather on               install the poller (5-min interval)"
+echo "  ghostty-shaders weather off              remove the poller"
+echo "  ghostty-shaders weather set-city <name>  geocode + save location"
+echo
+echo "Location config: $ENV_FILE"
+echo "  LAT=...  LON=...     direct coords, no 3P geocoding call"
+echo "  LOCATION=98101       city or US ZIP, geocoded ONCE and cached"
+echo
+echo "Pick a poem now (manual match):  ghostty-shaders select"

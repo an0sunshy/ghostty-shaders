@@ -1,33 +1,177 @@
 [
-  {"scene": "baseline", "median_ms": 0.05596, "min_ms": 0.05150, "pct_budget": 0.67, "ratio_to_baseline": 1.00},
-  {"scene": "ba-jiu-wen-yue", "median_ms": 3.10958, "min_ms": 2.74440, "pct_budget": 37.32, "ratio_to_baseline": 55.57},
-  {"scene": "bai-xue-ge", "median_ms": 4.98981, "min_ms": 3.60094, "pct_budget": 59.88, "ratio_to_baseline": 89.17},
-  {"scene": "chibi-huai-gu", "median_ms": 4.29125, "min_ms": 3.62365, "pct_budget": 51.50, "ratio_to_baseline": 76.68},
-  {"scene": "chun-jiang-hua-yue-ye", "median_ms": 3.38737, "min_ms": 2.74098, "pct_budget": 40.65, "ratio_to_baseline": 60.53},
-  {"scene": "chun-xiao", "median_ms": 2.09171, "min_ms": 2.01617, "pct_budget": 25.10, "ratio_to_baseline": 37.38},
-  {"scene": "clear-day", "median_ms": 0.20158, "min_ms": 0.16086, "pct_budget": 2.42, "ratio_to_baseline": 3.60},
-  {"scene": "clear-night", "median_ms": 0.35238, "min_ms": 0.24071, "pct_budget": 4.23, "ratio_to_baseline": 6.30},
-  {"scene": "cloudy", "median_ms": 0.43233, "min_ms": 0.30592, "pct_budget": 5.19, "ratio_to_baseline": 7.73},
-  {"scene": "deng-guanque-lou", "median_ms": 2.30815, "min_ms": 1.84598, "pct_budget": 27.70, "ratio_to_baseline": 41.25},
-  {"scene": "du-zuo-jingting", "median_ms": 1.08516, "min_ms": 0.86386, "pct_budget": 13.02, "ratio_to_baseline": 19.39},
-  {"scene": "feng-qiao-ye-bo", "median_ms": 2.83341, "min_ms": 2.32568, "pct_budget": 34.00, "ratio_to_baseline": 50.63},
-  {"scene": "feng-xue-su", "median_ms": 1.82271, "min_ms": 1.79724, "pct_budget": 21.87, "ratio_to_baseline": 32.57},
-  {"scene": "guan-canghai", "median_ms": 3.85992, "min_ms": 3.85618, "pct_budget": 46.32, "ratio_to_baseline": 68.98},
-  {"scene": "jiang-xue", "median_ms": 1.36022, "min_ms": 1.06856, "pct_budget": 16.32, "ratio_to_baseline": 24.31},
-  {"scene": "jing-ye-si", "median_ms": 1.59114, "min_ms": 1.54195, "pct_budget": 19.09, "ratio_to_baseline": 28.43},
-  {"scene": "lang-tao-sha", "median_ms": 1.14291, "min_ms": 0.99313, "pct_budget": 13.71, "ratio_to_baseline": 20.42},
-  {"scene": "qian-tang-hu-chun-xing", "median_ms": 3.69126, "min_ms": 3.59559, "pct_budget": 44.30, "ratio_to_baseline": 65.96},
-  {"scene": "qiu-xi", "median_ms": 1.99496, "min_ms": 1.98363, "pct_budget": 23.94, "ratio_to_baseline": 35.65},
-  {"scene": "rain", "median_ms": 0.24206, "min_ms": 0.19898, "pct_budget": 2.90, "ratio_to_baseline": 4.33},
-  {"scene": "shan-xing", "median_ms": 1.05821, "min_ms": 0.78505, "pct_budget": 12.70, "ratio_to_baseline": 18.91},
-  {"scene": "shi-zhi-sai-shang", "median_ms": 2.06179, "min_ms": 1.71283, "pct_budget": 24.74, "ratio_to_baseline": 36.84},
-  {"scene": "snow", "median_ms": 0.30945, "min_ms": 0.24012, "pct_budget": 3.71, "ratio_to_baseline": 5.53},
-  {"scene": "teng-wang-ge", "median_ms": 1.66548, "min_ms": 1.50680, "pct_budget": 19.99, "ratio_to_baseline": 29.76},
-  {"scene": "thunderstorm", "median_ms": 0.30803, "min_ms": 0.24465, "pct_budget": 3.70, "ratio_to_baseline": 5.50},
-  {"scene": "tianjingsha-qiusi", "median_ms": 2.91269, "min_ms": 2.52432, "pct_budget": 34.95, "ratio_to_baseline": 52.05},
-  {"scene": "wang-lushan-pubu", "median_ms": 2.40648, "min_ms": 2.26248, "pct_budget": 28.88, "ratio_to_baseline": 43.00},
-  {"scene": "wang-tianmen-shan", "median_ms": 2.64495, "min_ms": 2.59556, "pct_budget": 31.74, "ratio_to_baseline": 47.27},
-  {"scene": "xiao-chi", "median_ms": 1.04500, "min_ms": 0.81463, "pct_budget": 12.54, "ratio_to_baseline": 18.67},
-  {"scene": "ye-xue", "median_ms": 1.28600, "min_ms": 1.00580, "pct_budget": 15.43, "ratio_to_baseline": 22.98},
-  {"scene": "yin-hu-shang", "median_ms": 1.83608, "min_ms": 1.49256, "pct_budget": 22.03, "ratio_to_baseline": 32.81}
+  {
+    "scene": "baseline",
+    "median_ms": 0.05596,
+    "min_ms": 0.05150,
+    "pct_budget": 0.67,
+    "ratio_to_baseline": 1.00
+  },
+  {
+    "scene": "ba-jiu-wen-yue",
+    "median_ms": 3.10958,
+    "min_ms": 2.74440,
+    "pct_budget": 37.32,
+    "ratio_to_baseline": 55.57
+  },
+  {
+    "scene": "bai-xue-ge",
+    "median_ms": 4.98981,
+    "min_ms": 3.60094,
+    "pct_budget": 59.88,
+    "ratio_to_baseline": 89.17
+  },
+  {
+    "scene": "chibi-huai-gu",
+    "median_ms": 4.29125,
+    "min_ms": 3.62365,
+    "pct_budget": 51.50,
+    "ratio_to_baseline": 76.68
+  },
+  {
+    "scene": "chun-jiang-hua-yue-ye",
+    "median_ms": 3.38737,
+    "min_ms": 2.74098,
+    "pct_budget": 40.65,
+    "ratio_to_baseline": 60.53
+  },
+  {
+    "scene": "chun-xiao",
+    "median_ms": 2.09171,
+    "min_ms": 2.01617,
+    "pct_budget": 25.10,
+    "ratio_to_baseline": 37.38
+  },
+  {
+    "scene": "deng-guanque-lou",
+    "median_ms": 2.30815,
+    "min_ms": 1.84598,
+    "pct_budget": 27.70,
+    "ratio_to_baseline": 41.25
+  },
+  {
+    "scene": "du-zuo-jingting",
+    "median_ms": 1.08516,
+    "min_ms": 0.86386,
+    "pct_budget": 13.02,
+    "ratio_to_baseline": 19.39
+  },
+  {
+    "scene": "feng-qiao-ye-bo",
+    "median_ms": 2.83341,
+    "min_ms": 2.32568,
+    "pct_budget": 34.00,
+    "ratio_to_baseline": 50.63
+  },
+  {
+    "scene": "feng-xue-su",
+    "median_ms": 1.82271,
+    "min_ms": 1.79724,
+    "pct_budget": 21.87,
+    "ratio_to_baseline": 32.57
+  },
+  {
+    "scene": "guan-canghai",
+    "median_ms": 3.85992,
+    "min_ms": 3.85618,
+    "pct_budget": 46.32,
+    "ratio_to_baseline": 68.98
+  },
+  {
+    "scene": "jiang-xue",
+    "median_ms": 1.36022,
+    "min_ms": 1.06856,
+    "pct_budget": 16.32,
+    "ratio_to_baseline": 24.31
+  },
+  {
+    "scene": "jing-ye-si",
+    "median_ms": 1.59114,
+    "min_ms": 1.54195,
+    "pct_budget": 19.09,
+    "ratio_to_baseline": 28.43
+  },
+  {
+    "scene": "lang-tao-sha",
+    "median_ms": 1.14291,
+    "min_ms": 0.99313,
+    "pct_budget": 13.71,
+    "ratio_to_baseline": 20.42
+  },
+  {
+    "scene": "qian-tang-hu-chun-xing",
+    "median_ms": 3.69126,
+    "min_ms": 3.59559,
+    "pct_budget": 44.30,
+    "ratio_to_baseline": 65.96
+  },
+  {
+    "scene": "qiu-xi",
+    "median_ms": 1.99496,
+    "min_ms": 1.98363,
+    "pct_budget": 23.94,
+    "ratio_to_baseline": 35.65
+  },
+  {
+    "scene": "shan-xing",
+    "median_ms": 1.05821,
+    "min_ms": 0.78505,
+    "pct_budget": 12.70,
+    "ratio_to_baseline": 18.91
+  },
+  {
+    "scene": "shi-zhi-sai-shang",
+    "median_ms": 2.06179,
+    "min_ms": 1.71283,
+    "pct_budget": 24.74,
+    "ratio_to_baseline": 36.84
+  },
+  {
+    "scene": "teng-wang-ge",
+    "median_ms": 1.66548,
+    "min_ms": 1.50680,
+    "pct_budget": 19.99,
+    "ratio_to_baseline": 29.76
+  },
+  {
+    "scene": "tianjingsha-qiusi",
+    "median_ms": 2.91269,
+    "min_ms": 2.52432,
+    "pct_budget": 34.95,
+    "ratio_to_baseline": 52.05
+  },
+  {
+    "scene": "wang-lushan-pubu",
+    "median_ms": 2.40648,
+    "min_ms": 2.26248,
+    "pct_budget": 28.88,
+    "ratio_to_baseline": 43.00
+  },
+  {
+    "scene": "wang-tianmen-shan",
+    "median_ms": 2.64495,
+    "min_ms": 2.59556,
+    "pct_budget": 31.74,
+    "ratio_to_baseline": 47.27
+  },
+  {
+    "scene": "xiao-chi",
+    "median_ms": 1.04500,
+    "min_ms": 0.81463,
+    "pct_budget": 12.54,
+    "ratio_to_baseline": 18.67
+  },
+  {
+    "scene": "ye-xue",
+    "median_ms": 1.28600,
+    "min_ms": 1.00580,
+    "pct_budget": 15.43,
+    "ratio_to_baseline": 22.98
+  },
+  {
+    "scene": "yin-hu-shang",
+    "median_ms": 1.83608,
+    "min_ms": 1.49256,
+    "pct_budget": 22.03,
+    "ratio_to_baseline": 32.81
+  }
 ]

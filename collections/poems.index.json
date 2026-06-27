@@ -1,0 +1,29 @@
+{
+  "_note": "Per-scene affinity tags for the matcher. Each scene declares WHAT IT IS; the rule engine (collections/poems.rules.json) maps live facts to tag weights, and select scores each scene = sum of weights over its tags. Tag vocabulary: season {spring,summer,autumn,winter}; time {dawn,day,dusk,night}; weather {clear,rain,snow,cloud,wind,storm,fog}; sky {moon}; geo {river,sea,lake,mountain,plain,garden}; festival {mid-autumn,double-ninth,double-seventh}; mood {still,gentle,serene,expansive,lively,melancholy}. Authored from docs/poc-poetry/poems.json imagery. Adding a scene = add a row here.",
+  "scenes": {
+    "jing-ye-si":             { "tags": ["autumn", "night", "clear", "moon", "mid-autumn", "still"] },
+    "chun-jiang-hua-yue-ye":  { "tags": ["spring", "night", "clear", "moon", "river", "mid-autumn", "gentle"] },
+    "ba-jiu-wen-yue":         { "tags": ["night", "clear", "moon", "fog", "mid-autumn", "still"] },
+    "jiang-xue":              { "tags": ["winter", "day", "snow", "river", "still"] },
+    "ye-xue":                 { "tags": ["winter", "night", "snow", "still"] },
+    "bai-xue-ge":             { "tags": ["winter", "day", "snow", "wind", "lively"] },
+    "feng-xue-su":            { "tags": ["winter", "night", "snow", "wind", "storm"] },
+    "wang-lushan-pubu":       { "tags": ["day", "clear", "mountain", "river", "expansive"] },
+    "lang-tao-sha":           { "tags": ["autumn", "day", "sea", "storm", "wind", "lively"] },
+    "yin-hu-shang":           { "tags": ["day", "rain", "clear", "lake", "serene"] },
+    "chun-xiao":              { "tags": ["spring", "dawn", "rain", "garden", "gentle"] },
+    "shan-xing":              { "tags": ["autumn", "dusk", "clear", "mountain"] },
+    "qian-tang-hu-chun-xing": { "tags": ["spring", "dawn", "cloud", "lake", "gentle"] },
+    "feng-qiao-ye-bo":        { "tags": ["autumn", "night", "clear", "moon", "river", "melancholy"] },
+    "shi-zhi-sai-shang":      { "tags": ["dusk", "clear", "plain", "river", "expansive"] },
+    "deng-guanque-lou":       { "tags": ["day", "clear", "river", "mountain", "double-ninth", "expansive"] },
+    "tianjingsha-qiusi":      { "tags": ["autumn", "dusk", "wind", "plain", "melancholy"] },
+    "xiao-chi":               { "tags": ["summer", "day", "clear", "garden", "gentle"] },
+    "wang-tianmen-shan":      { "tags": ["day", "clear", "mountain", "river", "expansive"] },
+    "chibi-huai-gu":          { "tags": ["day", "sea", "storm", "wind", "expansive"] },
+    "qiu-xi":                 { "tags": ["autumn", "night", "clear", "double-seventh", "melancholy"] },
+    "du-zuo-jingting":        { "tags": ["dusk", "cloud", "mountain", "still"] },
+    "guan-canghai":           { "tags": ["autumn", "day", "night", "clear", "wind", "sea", "expansive"] },
+    "teng-wang-ge":           { "tags": ["autumn", "dusk", "cloud", "river", "serene"] }
+  }
+}

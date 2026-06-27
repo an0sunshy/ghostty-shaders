@@ -25,13 +25,15 @@ light-background terminals. This is the highest-value reviewer; be rigorous.
   passthrough, or writes glyph pixels is a legibility break.
 - Background brightness: `effect` added to `iBackgroundColor` must not push the
   backdrop so bright that dark glyphs lose contrast — check the brightest
-  fragment each scene can produce (lightning flash, sun/moon disk, snow).
-- Night dimming: scenes honor `IS_DAY` (baked by swap) so weather scenes dim at
-  night; verify the dim path exists and is meaningful.
-- Motion intensity: rain/snow/thunderstorm animation amplitude — flashes
-  (`thunderstorm`) and fast motion need a calm ceiling; treat this as the
-  reduced-motion analog until a real toggle exists, and flag if there's no way
-  to tame it.
+  fragment each scene can produce (a moon/sun disk, a lantern, waterfall spray,
+  a full-frame snow field).
+- Motion intensity: a scene's animation amplitude — fast drift, swirling, or
+  scrolling motion needs a calm ceiling; treat this as the reduced-motion analog
+  until a real toggle exists, and flag if there's no way to tame it.
+- Glow / bloom and additive-tint intensity: a bright focal element (a moon, a
+  lantern, a waterfall) or a saturated color wash must stay within a calm,
+  legible ceiling — the brightest and most-saturated fragment must not fight the
+  glyphs for attention or contrast.
 - Colorblind safety: scenes must not rely on red/green distinctions for meaning.
 - Light-background terminals: the additive composite assumes a dark bg; check
   what happens when `iBackgroundColor` is light.
@@ -42,9 +44,10 @@ light-background terminals. This is the highest-value reviewer; be rigorous.
       `term.rgb` is added back unmodified and glyphs are never tinted.
 - [ ] No scene's brightest output reduces glyph contrast below readable on a
       standard dark terminal; the worst-case fragment is bounded.
-- [ ] `IS_DAY` night-dimming is present and actually lowers brightness at night.
-- [ ] `thunderstorm` flash and all motion have a bounded intensity ceiling
-      (reduced-motion analog); document how a user could calm it.
+- [ ] Glow/bloom and additive-tint intensity stay within a calm legible ceiling;
+      the brightest, most-saturated fragment never fights the glyphs.
+- [ ] Motion amplitude has a bounded intensity ceiling (reduced-motion analog);
+      document how a user could calm it.
 - [ ] No meaning conveyed by red/green contrast alone.
 - [ ] Behavior on a light `iBackgroundColor` is checked, not assumed.
 
@@ -53,11 +56,11 @@ light-background terminals. This is the highest-value reviewer; be rigorous.
 Return findings as a list. Each item:
 
 - `severity`: blocker | major | minor | nit
-- `location`: file:area (e.g. `shaders/weather/thunderstorm.glsl:flash`)
+- `location`: file:area (e.g. `shaders/poems/feng-xue-su.glsl:glow`)
 - `finding`: the legibility/accessibility risk, with the line or term at fault
-- `suggested fix`: restore the passthrough, cap brightness, gate by `IS_DAY`,
-  or bound the motion/flash
+- `suggested fix`: restore the passthrough, cap brightness, tame the glow/tint,
+  or bound the motion
 
 A broken or altered `iChannel0` passthrough is an automatic blocker — it
 violates the core promise. A scene that washes out text at peak brightness, or
-an unbounded strobe, is at least major.
+whose glow/motion has no bounded ceiling, is at least major.

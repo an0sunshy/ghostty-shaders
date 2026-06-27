@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# 30-season — season provider. Emits {"season":..} from the local date and the
+# user's latitude (southern hemisphere is flipped 6 months). No network.
+# LAT is read from the location lib if available; absent ⇒ assume northern.
+set -euo pipefail
+
+# Pure: month (1–12) + latitude → meteorological season. lat < 0 ⇒ southern
+# hemisphere ⇒ shift by 6 months. A non-numeric / empty lat is treated as north.
+season_for() {
+    local m=$((10#$1)) lat="${2:-0}"
+    if [[ $lat == -* ]]; then m=$(( (m + 5) % 12 + 1 )); fi
+    case "$m" in
+        3|4|5)   echo spring ;;
+        6|7|8)   echo summer ;;
+        9|10|11) echo autumn ;;
+        *)       echo winter ;;   # 12, 1, 2
+    esac
+}
+
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then return 0; fi
+
+# Resolve LAT via the shared location lib (no network unless a LOCATION needs
+# geocoding; direct LAT/LON or a cached location.json stays local).
+DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+REPO_DIR="$(cd "$DIR/../../.." && pwd)"
+LAT=""
+# shellcheck source=../../../scripts/location-lib.sh disable=SC1091
+if [[ -f "$REPO_DIR/scripts/location-lib.sh" ]]; then
+    . "$REPO_DIR/scripts/location-lib.sh"
+    read_location >/dev/null 2>&1 || true
+fi
+
+MONTH=$(date +%m)
+printf '{"season":"%s"}\n' "$(season_for "$MONTH" "${LAT:-0}")"

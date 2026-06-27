@@ -16,8 +16,9 @@ surface documented in `SECURITY.md` and find the gaps.
   or with the user's shell environment.
 - Command injection / unquoted expansions: `$LAT`/`$LON`/`$CITY`/`$LOCATION`
   flowing into `curl`, `printf` into `location.json`, the generated plist
-  heredoc, and `pick_scene` arguments. Note that `config.env` is parsed with
-  `sed`, never `source`d — confirm that invariant holds.
+  heredoc, and the facts/tags fed to `scripts/match-rules.jq`. Note that
+  `config.env` is parsed with `sed`, never `source`d — confirm that invariant
+  holds.
 - `curl` usage: `-sf -m 10`, HTTPS-only endpoints, no auth header or
   identifying token, `--data-urlencode` for user-supplied city names.
 - Install footprint: the plist written to `~/Library/LaunchAgents/`, what

@@ -48,71 +48,20 @@ t_close() {  # t_close <description> <expected> <actual> <abs-tolerance>
 source "$REPO_ROOT/libexec/ghostty-shaders/weather"
 # shellcheck disable=SC1091
 source "$REPO_ROOT/libexec/ghostty-shaders/apply"
+# The matcher engine + its input providers (each returns at its own guard,
+# exposing only pure functions: time_phase, season_for, weather_class,
+# days_until, select_conf_num, score_scenes, sample_scene).
+# shellcheck disable=SC1091
+source "$REPO_ROOT/libexec/ghostty-shaders/select"
+for _p in "$REPO_ROOT"/libexec/ghostty-shaders/providers/*; do
+    # shellcheck disable=SC1090
+    source "$_p"
+done
 set +e +o pipefail
 
-# --- pick_scene: the full WMO mapping table from the README ------------------
-# 2>/dev/null drops the diagnostic log() on the unknown-code path; these
-# also pin the regression where that log line used to leak into stdout and
-# corrupt the captured scene name.
-
-while read -r code day want; do
-    t "pick_scene $code (is_day=$day) -> $want" "$want" "$(pick_scene "$code" "$day" 2>/dev/null)"
-done <<'EOF'
-0 1 clear-day
-0 0 clear-night
-1 1 clear-day
-1 0 clear-night
-2 1 cloudy
-3 1 cloudy
-45 1 cloudy
-48 0 cloudy
-51 1 rain
-53 1 rain
-55 1 rain
-56 1 rain
-57 1 rain
-61 1 rain
-63 0 rain
-65 1 rain
-66 1 rain
-67 1 rain
-80 1 rain
-81 1 rain
-82 0 rain
-71 1 snow
-73 1 snow
-75 1 snow
-77 0 snow
-85 1 snow
-86 1 snow
-95 1 thunderstorm
-96 0 thunderstorm
-99 1 thunderstorm
-33 1 clear-day
-33 0 clear-night
-EOF
-
-# Unknown codes must emit EXACTLY the scene name on stdout (the diagnostic
-# goes to stderr) — a multi-line result here would reach swap as a garbage
-# scene path.
-t "pick_scene unknown code emits a single clean line" \
-  "clear-day" "$(pick_scene 12345 1 2>/dev/null)"
-
-# --- scene_by_hour: offline fallback boundaries -------------------------------
-
-while read -r hour want; do
-    t "scene_by_hour $hour -> $want" "$want" "$(scene_by_hour "$hour")"
-done <<'EOF'
-00 clear-night
-05 clear-night
-06 clear-day
-08 clear-day
-09 clear-day
-12 clear-day
-17 clear-day
-18 clear-night
-23 clear-night
-EOF
+# (The legacy weather poller's pick_scene / scene_by_hour mapping was removed
+# with the weather scenes; the matcher's equivalents — weather_class, time_phase,
+# score_scenes — are tested further down.)
 
 # --- read_env_var: .env parsing without sourcing user config as code ----------
 
@@ -180,16 +129,15 @@ EOF
 t "normalize_is_day '' hour=12 -> 1.0" "1.0" "$(normalize_is_day "" 12)"
 t "normalize_is_day '' hour=05 -> 0.0" "0.0" "$(normalize_is_day "" 05)"
 
-# ...which must agree with the poller's scene_by_hour at EVERY hour — these
-# two day-window definitions live in different scripts and drifting apart
-# would mean a manual swap dims differently than the offline poll fallback.
+# ...whose day window is 06:00–17:59. Pin it at EVERY hour so the manual-swap
+# dimming boundary can't silently drift.
 mismatch=""
 for i in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23; do
     h="$(printf '%02d' "$i")"
-    if [[ "$(scene_by_hour "$h")" == "clear-day" ]]; then want_day="1.0"; else want_day="0.0"; fi
+    if (( 10#$h >= 6 && 10#$h < 18 )); then want_day="1.0"; else want_day="0.0"; fi
     [[ "$(normalize_is_day "" "$h")" == "$want_day" ]] || mismatch="$mismatch$h "
 done
-t "normalize_is_day clock fallback agrees with scene_by_hour all 24h" "" "$mismatch"
+t "normalize_is_day clock fallback day window (06–17) holds all 24h" "" "$mismatch"
 
 # --- seconds_since_midnight: zero-padded inputs (octal trap) -------------------
 
@@ -273,7 +221,7 @@ run_tt()    { HOME="$TT_HOME" PATH="$STUB:$PATH" "$@"; }
 has_shader() { if grep -q '^custom-shader' "$ACT" 2>/dev/null; then echo shader; else echo none; fi; }
 has_marker() { if [[ -f $MRK ]]; then echo yes; else echo no; fi; }
 
-run_tt "$GS" apply clear-night >/dev/null 2>&1
+run_tt "$GS" apply jing-ye-si >/dev/null 2>&1
 t "lifecycle: apply seeds an active shader include" "shader" "$(has_shader)"
 t "lifecycle: active state has no pause marker"     "no"     "$(has_marker)"
 t "lifecycle: toggle --status reports active"       "active" "$(run_tt "$GS" toggle --status | head -n 1)"
@@ -373,34 +321,47 @@ SEL_FILE="$SEL_HOME/.config/ghostty-shaders/selection"
 SEL_ACT="$SEL_HOME/.config/ghostty-shaders/active.conf"
 run_sel() { HOME="$SEL_HOME" PATH="$SEL_HOME/stubbin:$PATH" "$GS" "$@"; }
 
-t "list names both collections" "weather poems" \
-  "$(run_sel list 2>/dev/null | grep -oE '^  (weather|poems)' | awk '{print $1}' | sort -r | tr '\n' ' ' | sed 's/ $//')"
-t "list <collection> emits that collection's scenes" "6" \
-  "$(run_sel list weather 2>/dev/null | grep -c .)"
+t "list names the poems collection" "poems" \
+  "$(run_sel list 2>/dev/null | grep -oE '^  poems' | awk '{print $1}')"
+t "list <collection> emits that collection's scenes" "24" \
+  "$(run_sel list poems 2>/dev/null | grep -c .)"
 
-run_sel use rain >/dev/null 2>&1
-t "use pins the scene"                "rain"   "$(cat "$SEL_FILE" 2>/dev/null)"
-t "use applies the scene"             "shader" "$(grep -q '^custom-shader' "$SEL_ACT" 2>/dev/null && echo shader || echo none)"
+run_sel use jing-ye-si >/dev/null 2>&1
+t "use pins the scene"                "jing-ye-si" "$(cat "$SEL_FILE" 2>/dev/null)"
+t "use applies the scene"             "shader"     "$(grep -q '^custom-shader' "$SEL_ACT" 2>/dev/null && echo shader || echo none)"
 run_sel use not-a-real-scene >/dev/null 2>&1
-t "use rejects an unknown scene (rc)" "1"      "$?"
-t "use rejection leaves prior pin"    "rain"   "$(cat "$SEL_FILE" 2>/dev/null)"
+t "use rejects an unknown scene (rc)" "1"          "$?"
+t "use rejection leaves prior pin"    "jing-ye-si" "$(cat "$SEL_FILE" 2>/dev/null)"
 
-run_sel random weather >/dev/null 2>&1
+run_sel random poems >/dev/null 2>&1
 sel_pick="$(cat "$SEL_FILE" 2>/dev/null)"
 t "random <collection> pins a scene from it" "yes" \
-  "$(scene_path "$REPO_ROOT/shaders/weather" "$sel_pick" >/dev/null 2>&1 && echo yes || echo no)"
+  "$(scene_path "$REPO_ROOT/shaders/poems" "$sel_pick" >/dev/null 2>&1 && echo yes || echo no)"
 
-# Cron poller must NOT clobber a static pin: with the marker set, --cron skips
-# without touching active.conf.
+# --- select --cron poller guards (Phase 2) ------------------------------------
+# The matcher poller stands down under a static pin, exactly like the legacy one.
+mkdir -p "$SEL_HOME/Library/Caches/ghostty-shaders"
 printf 'jing-ye-si\n' > "$SEL_FILE"
 rm -f "$SEL_ACT"
-HOME="$SEL_HOME" PATH="$SEL_HOME/stubbin:$PATH" "$REPO_ROOT/libexec/ghostty-shaders/weather" --cron >/dev/null 2>&1
-t "cron poll stands down under a static pin" "jing-ye-si" "$(cat "$SEL_FILE" 2>/dev/null)"
-t "cron poll wrote no active include"        "none"       "$([[ -f $SEL_ACT ]] && echo some || echo none)"
+HOME="$SEL_HOME" PATH="$SEL_HOME/stubbin:$PATH" "$REPO_ROOT/libexec/ghostty-shaders/select" --cron >/dev/null 2>&1
+t "select --cron stands down under a static pin" "jing-ye-si" "$(cat "$SEL_FILE" 2>/dev/null)"
+t "select --cron wrote no active include"        "none"       "$([[ -f $SEL_ACT ]] && echo some || echo none)"
 
-# A manual `weather` is an explicit return to weather mode: it clears the pin.
-HOME="$SEL_HOME" PATH="$SEL_HOME/stubbin:$PATH" "$REPO_ROOT/libexec/ghostty-shaders/weather" >/dev/null 2>&1
-t "manual weather clears the static pin" "gone" "$([[ -f $SEL_FILE ]] && echo present || echo gone)"
+# ... and under a manual pause marker (no swap).
+rm -f "$SEL_FILE" "$SEL_ACT"
+touch "$SEL_HOME/Library/Caches/ghostty-shaders/paused"
+HOME="$SEL_HOME" PATH="$SEL_HOME/stubbin:$PATH" "$REPO_ROOT/libexec/ghostty-shaders/select" --cron >/dev/null 2>&1
+t "select --cron stands down when paused" "none" "$([[ -f $SEL_ACT ]] && echo some || echo none)"
+rm -f "$SEL_HOME/Library/Caches/ghostty-shaders/paused"
+
+# A manual `select` (auto-match now) clears any static pin and applies a poem.
+printf 'jing-ye-si\n' > "$SEL_FILE"
+HOME="$SEL_HOME" PATH="$SEL_HOME/stubbin:$PATH" GHOSTTY_SHADERS_SELECT_TEMP=0 \
+  GHOSTTY_SHADERS_FACTS='{"weather":"snow","phase":"night","season":"winter","temp_c":-3}' \
+  "$REPO_ROOT/libexec/ghostty-shaders/select" >/dev/null 2>&1
+t "manual select clears the static pin" "gone" "$([[ -f $SEL_FILE ]] && echo present || echo gone)"
+t "manual select applied the matched poem" "ye-xue" \
+  "$(grep -oE 'Active scen[a-z]*: [a-z-]+' "$SEL_ACT" 2>/dev/null | awk '{print $NF}')"
 
 [[ -n ${SEL_HOME:-} && -d $SEL_HOME ]] && rm -rf "$SEL_HOME"
 
@@ -418,6 +379,96 @@ pt_expected="$(awk -F'|' '!/^#/ && NF==3 {print $1 "\t" $2 " — " $3}' "$pt_fil
 html_titles="$(grep -oE 'data-scene="[^"]+"[[:space:]]+title="[^"]+"' "$REPO_ROOT/web/index.html" \
   | sed -E 's/data-scene="([^"]+)"[[:space:]]+title="([^"]+)"/\1\t\2/' | sort)"
 t "gallery poem tooltips match poems.titles" "$pt_expected" "$html_titles"
+
+# --- matcher: 20-time time_phase ----------------------------------------------
+while IFS=' ' read -r hh want; do
+    [[ -z $hh ]] && continue
+    t "time_phase $hh → $want" "$want" "$(time_phase "$hh")"
+done <<'EOF'
+00 night
+04 night
+05 dawn
+07 dawn
+08 day
+12 day
+16 day
+17 dusk
+20 dusk
+21 night
+23 night
+EOF
+
+# --- matcher: 30-season season_for (hemisphere-aware) -------------------------
+t "season_for north Jun → summer" "summer" "$(season_for 06 40.7)"
+t "season_for north Dec → winter" "winter" "$(season_for 12 40)"
+t "season_for north Mar → spring" "spring" "$(season_for 03 51)"
+t "season_for north Sep → autumn" "autumn" "$(season_for 09 35)"
+t "season_for south Jun → winter" "winter" "$(season_for 06 -33.8)"
+t "season_for south Dec → summer" "summer" "$(season_for 12 -33)"
+t "season_for equator Jun → summer (north default)" "summer" "$(season_for 06 0)"
+
+# --- matcher: 10-weather weather_class (WMO code → class) ----------------------
+t "weather_class 0  → clear" "clear" "$(weather_class 0)"
+t "weather_class 2  → cloud" "cloud" "$(weather_class 2)"
+t "weather_class 48 → fog"   "fog"   "$(weather_class 48)"
+t "weather_class 61 → rain"  "rain"  "$(weather_class 61)"
+t "weather_class 71 → snow"  "snow"  "$(weather_class 71)"
+t "weather_class 95 → storm" "storm" "$(weather_class 95)"
+t "weather_class 999 → clear (unknown)" "clear" "$(weather_class 999)"
+
+# --- matcher: 40-festival days_until ------------------------------------------
+t "days_until upcoming (58d)" "58" "$(days_until 2026-06-22 2026-08-19)"
+t "days_until tomorrow (1d)"  "1"  "$(days_until 2026-09-24 2026-09-25)"
+t "days_until today (0d)"     "0"  "$(days_until 2026-09-25 2026-09-25)"
+t "days_until passed (-1d)"   "-1" "$(days_until 2026-09-26 2026-09-25)"
+# Integration: the provider picks the nearest upcoming festival from the table.
+fest_out="$(GHOSTTY_SHADERS_TODAY=2026-09-24 "$REPO_ROOT/libexec/ghostty-shaders/providers/40-festival")"
+t "40-festival picks mid-autumn 1 day out" \
+  '{"festival":"mid-autumn","days_to_festival":1}' "$fest_out"
+
+# --- matcher: score_scenes (the rule engine) ----------------------------------
+# Snowy winter night: the night-snow poem (winter+night+snow) tops the list.
+snow_top="$(printf '%s' '{"weather":"snow","phase":"night","season":"winter","temp_c":-3}' \
+  | score_scenes | sort -t"$(printf '\t')" -k2 -nr | head -1 | cut -f1)"
+t "score_scenes snowy night top = ye-xue" "ye-xue" "$snow_top"
+# Veto: a warm clear day removes every snow-tagged scene from candidacy.
+warm_snow="$(printf '%s' '{"weather":"clear","phase":"day","temp_c":24}' \
+  | score_scenes | cut -f1 | grep -cE '^(jiang-xue|ye-xue|bai-xue-ge|feng-xue-su)$')"
+t "score_scenes vetoes snow scenes when warm" "0" "$warm_snow"
+# Offline (empty facts): all 24 poems remain candidates at score 0.
+empty_n="$(printf '%s' '{}' | score_scenes | wc -l | tr -d ' ')"
+t "score_scenes empty facts → 24 candidates" "24" "$empty_n"
+
+# --- matcher: sample_scene (deterministic weighted pick) ----------------------
+t "sample_scene argmax (temp 0)" "b" "$(printf 'a\t5\nb\t10\nc\t3\n' | sample_scene 0 0.5 '' 2.0)"
+t "sample_scene argmax breaks ties to first" "a" "$(printf 'a\t10\nb\t10\n' | sample_scene 0 0.5 '' 2.0)"
+t "sample_scene recency penalty drops a below equal-scored b" \
+  "b" "$(printf 'a\t10\nb\t10\n' | sample_scene 0 0.5 'a' 2.0)"
+t "sample_scene weighted draw low uniform → a" "a" "$(printf 'a\t0\nb\t0\n' | sample_scene 1 0.4 '' 0)"
+t "sample_scene weighted draw high uniform → b" "b" "$(printf 'a\t0\nb\t0\n' | sample_scene 1 0.6 '' 0)"
+
+# --- matcher: data consistency (index/rules ↔ scenes) -------------------------
+idx_scenes="$(jq -r '.scenes | keys[]' "$REPO_ROOT/collections/poems.index.json" | sort | tr '\n' ' ')"
+fs_poems="$(scene_names "$REPO_ROOT/shaders/poems" | tr '\n' ' ')"
+t "poems.index covers exactly the poem scenes" "$fs_poems" "$idx_scenes"
+
+rule_tags="$(jq -r '[.rules[] | ((.boost // {}) | keys[]), ((.veto // [])[])] | unique[]' \
+  "$REPO_ROOT/collections/poems.rules.json" | sort)"
+scene_tags="$(jq -r '[.scenes[].tags[]] | unique[]' "$REPO_ROOT/collections/poems.index.json" | sort)"
+unknown_tags="$(comm -23 <(printf '%s\n' "$rule_tags") <(printf '%s\n' "$scene_tags") | tr '\n' ' ' | sed -E 's/ +$//')"
+t "every rule boost/veto tag exists on some scene" "" "$unknown_tags"
+
+# Data files parse as JSON.
+t "poems.index.json parses"  "ok" "$(jq -e . "$REPO_ROOT/collections/poems.index.json" >/dev/null 2>&1 && echo ok || echo bad)"
+t "poems.rules.json parses"  "ok" "$(jq -e . "$REPO_ROOT/collections/poems.rules.json" >/dev/null 2>&1 && echo ok || echo bad)"
+t "festivals.json parses"    "ok" "$(jq -e . "$REPO_ROOT/data/festivals.json" >/dev/null 2>&1 && echo ok || echo bad)"
+
+# --- location-lib.sh: the shared extraction reads config faithfully -----------
+ll_env="$(mktemp)"
+printf 'LAT=12.5\nLON=-7.0\n' > "$ll_env"
+ll_lat="$( source "$REPO_ROOT/scripts/location-lib.sh"; read_env_var LAT "$ll_env" )"
+t "location-lib read_env_var extracts LAT" "12.5" "$ll_lat"
+rm -f "$ll_env"
 
 # --- summary -------------------------------------------------------------------
 

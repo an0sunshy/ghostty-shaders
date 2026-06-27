@@ -8,8 +8,8 @@
 # so a syntax checker such as glslangValidator (Linux CI) can validate the
 # exact text each host compiles, without the host or a GPU:
 #
-#   bench/wrap-shader.sh shaders/weather/cloudy.glsl                 > out.frag
-#   bench/wrap-shader.sh --profile es300 shaders/weather/cloudy.glsl > out.frag
+#   bench/wrap-shader.sh shaders/poems/jiang-xue.glsl                 > out.frag
+#   bench/wrap-shader.sh --profile es300 shaders/poems/jiang-xue.glsl > out.frag
 #   glslangValidator out.frag
 #
 # Profiles:

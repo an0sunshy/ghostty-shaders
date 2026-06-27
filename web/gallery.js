@@ -17,24 +17,10 @@
 const SCENE_NAMES = [...document.querySelectorAll('.scene-picker button')]
   .map((b) => b.dataset.scene);
 
-// Per-scene flavor for the fake terminal screenful (WMO code + description,
-// mirroring what ghostty-shaders weather logs for that condition).
-const SCENE_WMO = {
-  'clear-day':    [0,  'clear sky'],
-  'clear-night':  [0,  'clear sky'],
-  'cloudy':       [3,  'overcast'],
-  'rain':         [61, 'rain, slight'],
-  'snow':         [71, 'snow, slight'],
-  'thunderstorm': [95, 'thunderstorm'],
-};
-
-const MOON_NAMES = [
-  'new', 'wax cresc', 'first qtr', 'wax gibb',
-  'full', 'wan gibb', 'last qtr', 'wan cresc',
-];
-
 const state = {
-  scene: 'clear-night',
+  scene: 'jing-ye-si',
+  // Kept as fixed constants so bakeDefines stays byte-faithful to what
+  // ghostty-shaders apply injects (poems #ifndef-guard and ignore these).
   moonPhase: 0.5,
   timeOfDay: 43200, // seconds since midnight
   isDay: true,
@@ -152,14 +138,10 @@ function rebuildProgram() {
 // texture; scenes composite their sky BEHIND it. We simulate a screenful.
 
 function terminalLines() {
-  const [wmo, desc] = SCENE_WMO[state.scene] ?? [0, 'clear sky'];
-  const day = state.scene === 'clear-night' ? 'night'
-    : state.scene === 'clear-day' ? 'day'
-    : (state.isDay ? 'day' : 'night');
   return [
-    ['$ ', 'ghostty-shaders weather'],
-    ['', `poll: 47.61,-122.33 -> WMO ${wmo} (${desc}) · ${day}`],
-    ['', `swap: scene=${state.scene} -> weather-20260610.glsl`],
+    ['$ ', 'ghostty-shaders select'],
+    ['', `match: clear · night · autumn -> ${state.scene}`],
+    ['', `swap: scene=${state.scene} -> scene-20260610.glsl`],
     ['', 'swap: SIGUSR2 -> reloaded 3 surfaces in place'],
     ['', ''],
     ['$ ', 'ghostty-shaders toggle --status'],
@@ -292,15 +274,6 @@ function hideError() {
 
 // --- UI ------------------------------------------------------------------------
 
-function fmtTime(secs) {
-  const h = String(Math.floor(secs / 3600)).padStart(2, '0');
-  const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
-  return `${h}:${m}`;
-}
-function moonName(p) {
-  return MOON_NAMES[Math.round(p * 8) % 8];
-}
-
 function syncPauseButton() {
   const btn = $('ctl-pause');
   btn.setAttribute('aria-pressed', String(state.paused));
@@ -337,8 +310,6 @@ function syncControls() {
   for (const btn of document.querySelectorAll('.scene-picker button')) {
     btn.setAttribute('aria-pressed', String(btn.dataset.scene === state.scene));
   }
-  $('moon-out').value = moonName(state.moonPhase);
-  $('time-out').value = fmtTime(state.timeOfDay);
   $('poem-out').value = state.poemIntensity.toFixed(2);
   $('ss-out').value = `${state.ss}×`;
   $('mood-out').value = state.mood.toFixed(2);
@@ -434,18 +405,6 @@ function wireUI() {
       btn.append(zh, enEl);
     }
   }
-  $('ctl-moon').addEventListener('input', (e) => {
-    state.moonPhase = parseFloat(e.target.value);
-    onStateChange({ recompile: true });
-  });
-  $('ctl-time').addEventListener('input', (e) => {
-    state.timeOfDay = parseInt(e.target.value, 10);
-    onStateChange({ recompile: true });
-  });
-  $('ctl-day').addEventListener('change', (e) => {
-    state.isDay = e.target.checked;
-    onStateChange({ recompile: true, retexture: true });
-  });
   $('ctl-poem').addEventListener('input', (e) => {
     state.poemIntensity = parseFloat(e.target.value);
     onStateChange({ recompile: true });
@@ -479,9 +438,6 @@ function wireUI() {
   $('play-overlay').addEventListener('click', resume);
 
   // Reflect hash-set control values back into the inputs.
-  $('ctl-moon').value = String(state.moonPhase);
-  $('ctl-time').value = String(state.timeOfDay);
-  $('ctl-day').checked = state.isDay;
   $('ctl-poem').value = String(state.poemIntensity);
   $('ctl-ss').value = String(state.ss);
   $('ctl-mood').value = String(state.mood);

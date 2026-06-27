@@ -5,8 +5,8 @@
 #
 # Architecture:
 #   - Scene shaders (source of truth, versioned) live in this repo at
-#     shaders/<category>/<scene>.glsl (e.g. shaders/weather/rain.glsl,
-#     shaders/poems/jing-ye-si.glsl). Scene names are globally unique.
+#     shaders/<category>/<scene>.glsl (e.g. shaders/poems/jing-ye-si.glsl).
+#     Scene names are globally unique.
 #   - On invocation we copy the chosen scene to a NEW path each time
 #     (~/Library/Caches/ghostty-shaders/scene-<timestamp>.glsl) and point
 #     Ghostty's config-file include at it.

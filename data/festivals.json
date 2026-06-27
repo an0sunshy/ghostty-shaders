@@ -1,0 +1,17 @@
+{
+  "_note": "Gregorian dates for Chinese lunar / solar-term festivals, used by the 40-festival provider to emit {festival, days_to_festival}. Lunar→Gregorian dates are not computable here, so they are precomputed and verified against published calendars. Extend one year at a time. Only festivals that a poem scene can match (or whose signature tag exists) are listed.",
+  "festivals": {
+    "2026": {
+      "qingming": "2026-04-05",
+      "double-seventh": "2026-08-19",
+      "mid-autumn": "2026-09-25",
+      "double-ninth": "2026-10-18"
+    },
+    "2027": {
+      "qingming": "2027-04-05",
+      "double-seventh": "2027-08-08",
+      "mid-autumn": "2027-09-15",
+      "double-ninth": "2027-10-08"
+    }
+  }
+}

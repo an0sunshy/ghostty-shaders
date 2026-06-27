@@ -36,41 +36,13 @@ shoot() {  # shoot <output.png> <hash-params> [window-size]
         "http://localhost:$PORT/#$2" 2>/dev/null
 }
 
-# Lightning timestamp for the thunderstorm capture. Only ~30% of the scene's
-# 15-second slots fire (hash-gated in thunderstorm.glsl), so a baked-in t
-# silently produces a flash-less frame the day anyone retunes the scene's
-# timing. Unless GW_STORM_T pins one, sweep the first 12 slots at small size
-# and keep the brightest frame — PNG byte size is the luminance proxy (a
-# flash adds gradient entropy to an otherwise near-black image).
-storm_t() {
-    if [[ -n "${GW_STORM_T:-}" ]]; then
-        echo "$GW_STORM_T"
-        return
-    fi
-    local best="0.06" best_size=0 k t shot size
-    for k in 0 1 2 3 4 5 6 7 8 9 10 11; do
-        t="$(awk -v k="$k" 'BEGIN{printf "%.2f", k*15+0.06}')"
-        shot="$SITE/storm-sweep-$t.png"
-        shoot "$shot" "scene=thunderstorm&embed=1&day=0&t=$t" "400,261"
-        size="$(wc -c <"$shot")"
-        if (( size > best_size )); then best_size=$size; best=$t; fi
-    done
-    echo "storm sweep: brightest frame at t=$best" >&2
-    echo "$best"
-}
-
-# Per-scene hash params: settings each scene looks best under, with a fixed
-# iTime chosen so animated effects are mid-action. A new scene must get an
-# entry here (the error arm keeps a missing one loud, not silently skipped).
+# Per-scene hash params: a fixed iTime chosen so the animation is mid-action.
+# Poems are slow loops, so a single mid-cycle frame reads well; t=6 is the
+# default. Add a per-scene override here when a particular poem looks best at a
+# different moment.
 params_for() {
     case "$1" in
-        clear-day)    echo "time=28800&t=2" ;;          # 08:00 morning sun
-        clear-night)  echo "moon=0.5&t=4" ;;            # full moon
-        cloudy)       echo "day=1&t=6" ;;
-        rain)         echo "day=1&t=5" ;;
-        snow)         echo "day=1&t=7" ;;
-        thunderstorm) echo "day=0&t=$(storm_t)" ;;
-        *)            echo "capture-assets.sh: no params_for entry for scene: $1" >&2; return 1 ;;
+        *)  echo "t=6" ;;
     esac
 }
 

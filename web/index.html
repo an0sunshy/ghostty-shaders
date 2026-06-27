@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ghostty-shaders — live scene gallery</title>
   <meta name="description"
-        content="Weather-driven background shaders for the Ghostty terminal — every scene running live in WebGL2, from the exact GLSL files Ghostty compiles.">
+        content="Animated classical-poem background shaders for the Ghostty terminal — every scene running live in WebGL2, from the exact GLSL files Ghostty compiles.">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header>
     <h1>ghostty-shaders</h1>
     <p class="tagline">
-      Weather-driven background shaders for the
+      Animated classical Chinese poem background shaders for the
       <a href="https://ghostty.org">Ghostty</a> terminal.
       Every scene below is the <em>exact</em> <code>.glsl</code> file Ghostty
       compiles — fetched verbatim and wrapped in a
@@ -28,15 +28,6 @@
 
   <main>
     <div class="scene-picker" role="group" aria-label="Scene">
-      <div class="scene-group">
-        <span class="group-label">Weather</span>
-      <button data-scene="clear-day"    aria-pressed="false">☀️ clear-day</button>
-      <button data-scene="clear-night"  aria-pressed="false">🌙 clear-night</button>
-      <button data-scene="cloudy"       aria-pressed="false">☁️ cloudy</button>
-      <button data-scene="rain"         aria-pressed="false">🌧️ rain</button>
-      <button data-scene="snow"         aria-pressed="false">❄️ snow</button>
-      <button data-scene="thunderstorm" aria-pressed="false">⛈️ thunderstorm</button>
-      </div>
       <div class="scene-group">
         <span class="group-label">Poems <small>(hover or select for the English title)</small></span>
       <button data-scene="jing-ye-si"             title="靜夜思 (Jìng Yè Sī) — Quiet Night Thoughts" aria-pressed="false">🌙 靜夜思</button>
@@ -86,17 +77,6 @@
     </div>
 
     <div class="controls">
-      <label data-for-scene="clear-night">
-        moon phase <output id="moon-out">full</output>
-        <input id="ctl-moon" type="range" min="0" max="0.99" step="0.01" value="0.5">
-      </label>
-      <label data-for-scene="clear-day">
-        time of day <output id="time-out">12:00</output>
-        <input id="ctl-time" type="range" min="0" max="86340" step="300" value="43200">
-      </label>
-      <label data-for-scene="cloudy rain snow thunderstorm" class="check">
-        <input id="ctl-day" type="checkbox" checked> daylight
-      </label>
       <label data-for-scene="jing-ye-si chun-jiang-hua-yue-ye ba-jiu-wen-yue jiang-xue ye-xue bai-xue-ge feng-xue-su wang-lushan-pubu lang-tao-sha yin-hu-shang chun-xiao shan-xing qian-tang-hu-chun-xing feng-qiao-ye-bo shi-zhi-sai-shang deng-guanque-lou tianjingsha-qiusi xiao-chi wang-tianmen-shan chibi-huai-gu qiu-xi du-zuo-jingting guan-canghai teng-wang-ge">
         intensity <output id="poem-out">1.00</output>
         <input id="ctl-poem" type="range" min="0" max="1.5" step="0.05" value="1.0">
@@ -131,13 +111,14 @@
 
   <footer>
     <p>
-      In the terminal, a 5-minute poller maps live
-      <a href="https://open-meteo.com/">Open-Meteo</a> conditions to a scene
-      and hot-reloads Ghostty in place. The sliders above re-bake the same
-      <code>#define</code>s the swap script injects (moon phase, time of day,
-      day/night) and recompile — exactly how a real swap works. Text stays
-      legible because scenes composite <em>behind</em> the glyph layer, here
-      simulated with a fake terminal screenful.
+      In the terminal, a 5-minute poller matches a poem to your live
+      conditions — <a href="https://open-meteo.com/">Open-Meteo</a> weather,
+      time of day, season, and festival proximity — and hot-reloads Ghostty in
+      place. The sliders above re-bake the same <code>#define</code>s the swap
+      script injects (intensity and the mood / energy / density / glow feeling
+      dials) and recompile — exactly how a real swap works. Text stays legible
+      because scenes composite <em>behind</em> the glyph layer, here simulated
+      with a fake terminal screenful.
     </p>
     <p>
       MIT licensed. The tab pauses itself when hidden — the same

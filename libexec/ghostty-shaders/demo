@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ghostty-shaders demo — cycle through the weather scenes for visual review.
+# ghostty-shaders demo — cycle through the poem scenes for visual review.
 # Each scene displays for DURATION seconds (default 10) before applying the
 # next. Loops until Ctrl-C. (The `demo` subcommand; entry point is
 # bin/ghostty-shaders.)
@@ -22,12 +22,12 @@ REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 APPLY="$SCRIPT_DIR/apply"
 DURATION="${1:-10}"
 
-# Cycle the weather collection — discovered, not hardcoded, so a new weather
+# Cycle the poems collection — discovered, not hardcoded, so a new poem
 # scene shows up here automatically (same recursive lookup the rest use).
 # shellcheck source=../../scripts/scene-discovery.sh disable=SC1091
 . "$REPO_DIR/scripts/scene-discovery.sh"
 SCENES=()
-while IFS= read -r s; do SCENES+=("$s"); done < <(scene_names "$REPO_DIR/shaders/weather")
+while IFS= read -r s; do SCENES+=("$s"); done < <(scene_names "$REPO_DIR/shaders/poems")
 
 if ! [[ "$DURATION" =~ ^[0-9]+$ ]]; then
     echo "usage: ghostty-shaders demo [seconds-per-scene]" >&2

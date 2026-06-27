@@ -3,64 +3,56 @@
 ![CI](https://github.com/an0sunshy/ghostty-shaders/actions/workflows/ci.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 
-Live background shaders for the [Ghostty](https://ghostty.org) terminal,
-organized into **collections** you can run two ways:
+Animated **classical Chinese poem** background shaders for the
+[Ghostty](https://ghostty.org) terminal — 24 scenes evoking the 意境 of poems
+like 靜夜思, 春江花月夜, and 江雪.
 
-- **weather** — a small daemon polls your local weather every 5 minutes and
-  swaps Ghostty's `custom-shader` to match (clear day, clear night with a
-  phase-accurate moon, clouds, rain, snow, thunderstorm), reloading every open
-  window in place, no restart.
-- **poems** — 24 animated scenes evoking the 意境 of classical Chinese poems
-  (静夜思, 春江花月夜, 江雪, …). Pin one with `ghostty-shaders use <scene>` and
-  keep it, or `ghostty-shaders random` for a fresh one.
-
-More collections can be added as `shaders/<collection>/` folders. Text stays
-fully legible either way: every scene renders **behind** the terminal contents
-and lets the glyph layer pass through untouched.
+A small daemon **matches a poem to your live conditions** every 5 minutes —
+local weather, time of day, season, and proximity to a festival — and hot-swaps
+Ghostty's `custom-shader`, reloading every open window in place, no restart. Or
+pin one and keep it (`ghostty-shaders use <scene>`). Text stays fully legible:
+every scene renders **behind** the terminal contents and lets the glyph layer
+pass through untouched.
 
 **[Live demo →](https://an0sunshy.github.io/ghostty-shaders/)** — every scene
-running in your browser, with moon-phase, time-of-day, and day/night
-controls. The gallery compiles the **exact** `.glsl` files Ghostty runs,
-wrapped in a short WebGL2 preamble — scenes are written in the
-[portable GLSL subset](docs/shader-portability.md) and CI validates every
-one under both the desktop GL and WebGL2 profiles.
+running in your browser, with the per-poem feeling dials as live sliders. The
+gallery compiles the **exact** `.glsl` files Ghostty runs, wrapped in a short
+WebGL2 preamble — scenes are written in the
+[portable GLSL subset](docs/shader-portability.md) and CI validates every one
+under both the desktop GL and WebGL2 profiles.
 
-## Screenshots
+## The collection
 
-Captured from the [live gallery](https://an0sunshy.github.io/ghostty-shaders/) —
-the exact scene shaders compositing behind a simulated terminal screenful,
-at deterministic timestamps (`scripts/capture-assets.sh` regenerates them).
+[![the poem collection](docs/poc-poetry/contact-all.png)](https://an0sunshy.github.io/ghostty-shaders/)
 
-| | |
-|---|---|
-| ![clear-day — morning sun](assets/clear-day.png) | ![clear-night — full moon and stars](assets/clear-night.png) |
-| ![cloudy — drifting overcast](assets/cloudy.png) | ![rain — falling streaks](assets/rain.png) |
-| ![snow — drifting flakes](assets/snow.png) | ![thunderstorm — mid lightning flash](assets/thunderstorm.png) |
-
-> Contributors: real terminal captures (and a short GIF of a live swap) are
-> welcome additions under `assets/`.
-
----
+Twenty-four scenes, each a luminous-on-dark composition built on 留白 (negative
+space) so the centre stays open for legible text. Full list and authoring notes:
+[docs/poc-poetry.md](docs/poc-poetry.md).
 
 ## How it works
 
 ```text
- ┌─ ghostty-shaders weather ─┐      ┌─ ghostty-shaders apply ─┐      ┌─ Ghostty ─┐
- │ Open-Meteo current     │      │ pick scene .glsl       │      │ reload    │
- │ weather + is_day  ─────┼─────▶│ bake moon-phase/time   │─────▶│ config    │
- │ (LaunchAgent, 5 min)  │      │ write active.conf      │      │ recompile │
- └────────────────────────┘      │ kill -USR2 ghostty ────┼─────▶│ shader    │
-                                  └────────────────────────┘      └───────────┘
+ ┌─ select --cron (5 min) ──┐   ┌─ rule engine ──────┐   ┌─ apply ──────┐   ┌ Ghostty ┐
+ │ providers → facts:       │   │ score every poem   │   │ bake #defines│   │ reload   │
+ │  weather · time · season │──▶│ against its tags,  │──▶│ write active │──▶│ recompile│
+ │  · festival proximity    │   │ then weighted-pick │   │ kill -USR2   │   │ shader   │
+ └──────────────────────────┘   └────────────────────┘   └──────────────┘   └──────────┘
 ```
 
-1. **`ghostty-shaders weather`** fetches the current condition from Open-Meteo
-   (free, no API key) for your location and maps the
-   [WMO weather code](https://open-meteo.com/en/docs) + day/night flag to a scene.
-2. **`ghostty-shaders apply`** copies that scene to a fresh file under
-   `~/Library/Caches/ghostty-shaders/`, bakes in the current time-of-day and
-   moon phase as `#define`s, and points `active.conf` at it.
-3. **Ghostty** reloads on `SIGUSR2` and recompiles the shader for every open
-   surface — the new sky appears within a frame.
+1. **Providers** (`libexec/ghostty-shaders/providers/`) each emit JSON *facts*:
+   live weather from [Open-Meteo](https://open-meteo.com/) (free, no API key),
+   the time-of-day phase, the season (from date + latitude), and the nearest
+   festival. Offline or a failed provider just drops that fact.
+2. **The rule engine** scores every poem: declarative rules
+   (`collections/poems.rules.json`) map facts to weighted tags, each scene
+   declares what it *is* (`collections/poems.index.json`), and the score is the
+   overlap. A temperature-controlled **weighted-random** pick adds variety, with
+   a recency penalty so it doesn't repeat.
+3. **`apply`** copies the chosen scene to a fresh file under
+   `~/Library/Caches/ghostty-shaders/`, bakes the feeling dials in as
+   `#define`s, and points `active.conf` at it.
+4. **Ghostty** reloads on `SIGUSR2` and recompiles for every open surface — the
+   new scene appears within a frame.
 
 If a scene fails to compile, the swap catches it in Ghostty's log and reverts to
 the previous one, so a bad edit never leaves you shaderless.
@@ -71,7 +63,8 @@ the previous one, so a bad edit never leaves you shaderless.
 - **macOS** for the automatic poller (`launchd`) and the compile-validation
   step (`/usr/bin/log`). The shaders and the manual `apply`/`toggle`/`demo`
   subcommands work on Linux Ghostty too — see [Cross-platform](#cross-platform).
-- `curl`. `jq` is optional (used if present; there's a grep fallback).
+- `curl` for weather + geocoding. **`jq`** powers the matcher's rule engine; if
+  it's absent the poller degrades to a simple time-of-day pick (and says so).
 
 ## Install
 
@@ -90,20 +83,11 @@ so it works regardless of how your main config is managed.
 
 ## Usage
 
-There are two modes. **Static** — pin a scene and keep it:
+**Auto** — let the poller match a poem to live conditions:
 
 ```sh
-ghostty-shaders list                  # collections and their scene counts
-ghostty-shaders list poems            # the scene names in one collection
-ghostty-shaders use jing-ye-si        # pin one scene and keep it
-ghostty-shaders random poems          # pin a random scene from a collection
-ghostty-shaders random                # ... or from any collection
-```
-
-**Weather** — let the poller drive the scene from live conditions:
-
-```sh
-ghostty-shaders weather               # poll once and apply the matching scene
+ghostty-shaders select                # match once now and apply
+ghostty-shaders select --print        # dry-run: show the pick (and why) — applies nothing
 ghostty-shaders weather on            # install the 5-min auto-poller
 ghostty-shaders weather off           # remove it
 ```
@@ -112,21 +96,25 @@ The poller runs every **5 minutes** by default; to change it, set the interval
 (in seconds) when you enable it:
 `GHOSTTY_SHADERS_POLL_INTERVAL=600 ghostty-shaders weather on`.
 
-While a scene is pinned with `use`/`random`, the cron poller stands down so it
-won't clobber your pick; any `weather` command returns you to weather mode.
-Per-new-window random rotation is [deferred](docs/random-per-window.md). Other
-commands:
+**Static** — pin a scene and keep it:
 
 ```sh
-ghostty-shaders apply clear-night     # apply a scene once, without pinning it
-ghostty-shaders toggle                # pause / resume the active shader
-ghostty-shaders toggle --status       # show current scene / paused state
-ghostty-shaders demo [seconds]        # cycle the weather scenes for a visual review
-ghostty-shaders moon-demo [seconds]   # cycle clear-night through all 8 lunar phases
+ghostty-shaders list poems            # the scene names in the collection
+ghostty-shaders use jing-ye-si        # pin one scene and keep it
+ghostty-shaders random poems          # pin a random scene from the collection
 ```
 
-Scenes: `clear-day` · `clear-night` · `cloudy` · `rain` · `snow` ·
-`thunderstorm` (fog maps to `cloudy` for now).
+While a scene is pinned with `use`/`random`, the cron poller stands down so it
+won't clobber your pick; `ghostty-shaders select` (or `weather on`) returns you
+to auto mode. Per-new-window random rotation is
+[deferred](docs/random-per-window.md). Other commands:
+
+```sh
+ghostty-shaders apply jing-ye-si      # apply a scene once, without pinning it
+ghostty-shaders toggle                # pause / resume the active shader
+ghostty-shaders toggle --status       # show current scene / paused state
+ghostty-shaders demo [seconds]        # cycle the poem scenes for a visual review
+```
 
 ## Configuration
 
@@ -151,7 +139,8 @@ ghostty-shaders weather set-city "Seattle, WA"
 ```
 
 Direct `LAT`/`LON` make **zero** third-party calls. A city/ZIP is geocoded a
-single time and cached in `location.json`; subsequent polls reuse it.
+single time and cached in `location.json`; subsequent polls reuse it. Latitude
+also drives the season fact, so the southern hemisphere is matched correctly.
 
 ### Poem feeling dials
 
@@ -170,23 +159,22 @@ ghostty-shaders use jiang-xue
 The [live gallery](https://an0sunshy.github.io/ghostty-shaders/) exposes the
 same four as live sliders for any poem.
 
-### Weather → scene mapping
+### Tuning the matcher
 
-| WMO codes | Scene |
-|---|---|
-| 0, 1 | `clear-day` / `clear-night` (by `is_day`) |
-| 2, 3, 45, 48 | `cloudy` |
-| 51–67, 80–82 | `rain` |
-| 71–77, 85, 86 | `snow` |
-| 95, 96, 99 | `thunderstorm` |
+The matcher is data, not code — edit and re-run, no rebuild:
 
-### Moon phases
+- **`collections/poems.index.json`** — each scene's affinity tags (season, time,
+  weather, festival, geography, mood). Adding a scene is one row here.
+- **`collections/poems.rules.json`** — declarative `when → boost/veto` rules
+  mapping live facts to tag weights.
+- **`data/festivals.json`** — precomputed Gregorian dates for the festivals the
+  matcher knows (Mid-Autumn, Qingming, Double Seventh, Double Ninth).
+- **`collections/poems.conf`** — `selection_temperature` (0 = always the top
+  match; higher = more variety) and the recency window.
 
-`clear-night` renders the moon with a real, phase-accurate terminator. The
-phase is computed at swap time from the synodic cycle (29.53 days) and baked
-into the shader as `#define MOON_PHASE` (∈ `[0,1)`: `0` new, `0.25` first
-quarter, `0.5` full, `0.75` last quarter). Preview the whole cycle with
-`ghostty-shaders moon-demo`.
+Adding a new input is a new file in `providers/` that prints a JSON fact — the
+engine needs no change. `ghostty-shaders select --print` shows the merged facts
+and the top-scoring scenes, so you can see exactly why a poem was chosen.
 
 ## Technical notes
 
@@ -195,10 +183,10 @@ quarter, `0.5` full, `0.75` last quarter). Preview the whole cycle with
   picked up rather than skipped, and keeps a previous shader file alive while
   another surface may still be compiling it (the cache keeps the 10 most
   recent).
-- **Why baked `#define`s instead of uniforms.** Time-of-day and moon phase are
-  injected as `#define`s because Ghostty does not expose a date/clock uniform
-  (`iDate`) to custom shaders. Scenes guard each macro with `#ifndef`, so they
-  also compile stand-alone.
+- **Why baked `#define`s instead of uniforms.** The feeling dials are injected
+  as `#define`s because Ghostty does not expose a date/clock uniform (`iDate`)
+  to custom shaders. Scenes guard each macro with `#ifndef`, so they also
+  compile stand-alone.
 - **Symlink-safe.** The commands resolve their own real path (following
   `~/.local/bin` symlinks with portable `readlink`), so the bundled scenes are
   found no matter how the command was invoked.
@@ -207,24 +195,16 @@ quarter, `0.5` full, `0.75` last quarter). Preview the whole cycle with
 
 These shaders run a full-screen fragment pass every frame the terminal is
 visible, so the gate is GPU time as a percentage of the display's per-frame
-budget (8.33 ms at 120 Hz). Every scene is kept under **5%**, and CI enforces it.
+budget (8.33 ms at 120 Hz). Poems are opt-in art a user selects (not an
+always-on default), so the collection carries a **75%** per-frame ceiling,
+enforced by `bench/run-bench.sh`; every shipped scene sits comfortably under it.
 
 ```sh
 bench/run-bench.sh            # build + benchmark all scenes at 3456×2234
 ```
 
-Snapshot at 3456×2234 / 120 Hz on an M1 Max (% of the 8.33 ms frame budget):
-
-| scene | % budget | | scene | % budget |
-|---|---|---|---|---|
-| clear-day | 2.2% | | snow | 3.2% |
-| rain | 2.5% | | clear-night | 3.6% |
-| thunderstorm | 3.1% | | cloudy | 4.6% |
-
-Three scenes started well over budget (clear-night 23%, cloudy 18%, snow 6%) and
-were optimized down without changing their look. The headless harness, the
-OpenGL-over-Metal caveat, and how to tune a scene are documented in
-**[docs/performance.md](docs/performance.md)**.
+The headless harness, the OpenGL-over-Metal caveat, and how to tune a scene are
+documented in **[docs/performance.md](docs/performance.md)**.
 
 ## Cross-platform
 
@@ -252,11 +232,12 @@ Contributions are welcome — new scenes especially. Start with
 [`docs/scene-authoring.md`](docs/scene-authoring.md) guide for the uniform list,
 baked `#define`s, and the legibility-and-performance conventions every scene
 must follow. Two gates are non-negotiable: the **compute gate**
-(`bench/run-bench.sh`, every scene under 5% of the frame budget) and the
-**golden-image** check. The decision logic (weather→scene mapping, moon
-phase, config parsing) is unit-tested by `tests/run-tests.sh`, which runs
-in CI on Linux. Beyond CI, the repo keeps a panel of review personas —
-reproducible Claude Code reviewers that judge what CI can't.
+(`bench/run-bench.sh`, every scene under its collection's budget) and the
+**golden-image** check. The decision logic (the matcher's providers, rule
+engine, and weighted pick, plus config parsing) is unit-tested by
+`tests/run-tests.sh`, which runs in CI on Linux. Beyond CI, the repo keeps a
+panel of review personas — reproducible Claude Code reviewers that judge what CI
+can't.
 
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, adding a scene, commit style
 - [`docs/scene-authoring.md`](docs/scene-authoring.md) — shader conventions
@@ -272,8 +253,10 @@ MIT — see [LICENSE](LICENSE).
 
 ```text
 bin/          the single `ghostty-shaders` dispatcher (the only command on PATH)
-libexec/      subcommand implementations (apply, weather, toggle, demos)
-shaders/      scene shaders by collection (weather/, poems/) + portable GLSL helpers
+libexec/      subcommand implementations (apply, select, weather, toggle, demo) + providers/
+shaders/      scene shaders (poems/) + portable GLSL helpers
+collections/  per-collection metadata: display titles, the matcher index + rules, knobs
+data/         precomputed festival dates for the matcher
 web/          the WebGL2 scene gallery (the GitHub Pages demo)
 bench/        headless GPU timing + golden-image harness (the compute gate)
 scripts/      scene discovery + process helpers, gallery build / serve, asset capture

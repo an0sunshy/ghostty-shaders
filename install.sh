@@ -150,7 +150,7 @@ cmd_install() {
     echo
     echo "✓ installed. Next:"
     echo "    ghostty-shaders weather set-city \"Seattle, WA\"   # set your location"
-    echo "    ghostty-shaders apply clear-night                 # try a scene now"
+    echo "    ghostty-shaders select                            # match a poem to right now"
     echo "    ghostty-shaders weather on                        # enable 5-min auto-updates"
 }
 

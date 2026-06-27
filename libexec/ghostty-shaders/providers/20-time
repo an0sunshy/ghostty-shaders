@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# 20-time — time-of-day provider. Emits {"phase":..,"hour":H} from the local
+# clock. phase ∈ {dawn,day,dusk,night}. No network, no deps.
+set -euo pipefail
+
+# Pure: map a 0–23 hour to a phase. 10# guards zero-padded "08" from octal.
+time_phase() {
+    local h=$((10#$1))
+    if   (( h < 5 || h >= 21 )); then echo night
+    elif (( h < 8 ));            then echo dawn   # 5,6,7
+    elif (( h < 17 ));           then echo day    # 8..16
+    else                              echo dusk   # 17..20
+    fi
+}
+
+# Sourced (by tests) ⇒ stop here; everything below has side effects / output.
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then return 0; fi
+
+HOUR=$(date +%H)
+printf '{"phase":"%s","hour":%d}\n' "$(time_phase "$HOUR")" "$((10#$HOUR))"

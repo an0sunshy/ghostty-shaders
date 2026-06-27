@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Poem scene matcher.** The poller now selects a *poem* from live conditions
+  instead of swapping literal weather scenes. Pluggable input providers
+  (`libexec/ghostty-shaders/providers/`) emit JSON facts — weather, time-of-day,
+  season, festival proximity; a declarative rule engine
+  (`collections/poems.rules.json` + `scripts/match-rules.jq`) scores every poem
+  against its affinity tags (`collections/poems.index.json`); and a
+  temperature-controlled weighted-random pick (with a recency penalty) chooses
+  one. `ghostty-shaders select [--print]` runs a match on demand; the
+  LaunchAgent runs `select --cron`. Tunable via `collections/poems.conf` and
+  `data/festivals.json` — and adding a new input is just a new provider file, no
+  engine change.
 - **WebGL2 web gallery** (`web/`), deployed to GitHub Pages: every scene
   running live in the browser from the exact `.glsl` sources, behind a
   simulated terminal screenful, with moon-phase / time-of-day / day-night
@@ -36,6 +47,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (bash + awk), runs on macOS and Linux, wired into CI. The scripts under
   test gained sourced-return guards so the harness can call their functions
   directly.
+
+### Changed
+
+- The `weather` subcommand is now poller + location management only
+  (`on` / `off` / `set-city`); `weather on` installs the `select --cron`
+  poller. Location resolution was extracted to a shared
+  `scripts/location-lib.sh` used by the weather provider, `select`, and
+  `weather`. `demo` now cycles the poem scenes.
+
+### Removed
+
+- **The six weather scenes** (`clear-day`, `clear-night`, `cloudy`, `rain`,
+  `snow`, `thunderstorm`) and everything specific to them: the `pick_scene` /
+  `scene_by_hour` WMO→scene mapping, the `moon-demo` command, the gallery's
+  weather button group and moon / time-of-day / day-night controls, and their
+  golden, baseline, and `assets/` capture files. Git history preserves them.
 
 ### Fixed
 

@@ -20,7 +20,7 @@ designed to complement, not duplicate, each other — see
   before they open a PR, and read the charters to learn what "good" means here.
 - **Single-responsibility.** Each persona owns one concern and names the
   concrete files it inspects, so findings are specific to this repo (e.g. "the
-  `iChannel0` passthrough in `snow.glsl`"), not generic lint.
+  `iChannel0` passthrough in `jiang-xue.glsl`"), not generic lint.
 - **Composable.** Run one when you touch one area; fan out the whole panel for a
   release.
 
@@ -28,11 +28,11 @@ designed to complement, not duplicate, each other — see
 
 | Persona | Owns | What it flags here |
 |---|---|---|
-| [`oss-maintainer`](../.claude/agents/oss-maintainer.md) | Star-worthiness & contribution friction | Missing/placeholder hero visual, absent LICENSE/CONTRIBUTING/CoC/SECURITY, issue & PR templates, scene-name drift across README ↔ `pick_scene()` ↔ `shaders/`, CHANGELOG/semver hygiene |
+| [`oss-maintainer`](../.claude/agents/oss-maintainer.md) | Star-worthiness & contribution friction | Missing/placeholder hero visual, absent LICENSE/CONTRIBUTING/CoC/SECURITY, issue & PR templates, scene-name drift across README ↔ `collections/poems.index.json` ↔ `shaders/`, CHANGELOG/semver hygiene |
 | [`end-user-advocate`](../.claude/agents/end-user-advocate.md) | Install / upgrade / uninstall UX | `./install.sh` on a clean Mac, the `git pull` upgrade story, no-`jq` / no-network / on-battery behavior, compile-failure auto-revert, clarity of error messages, `toggle`/`--status` |
 | [`security-reviewer`](../.claude/agents/security-reviewer.md) | Threat model of the bash + install footprint | Command injection / unquoted expansions, `curl` usage, the LaunchAgent plist & `config-file` include, `SIGUSR2` targeting, location privacy (direct LAT/LON = zero 3P calls), no secrets in logs — cross-checked against [`SECURITY.md`](../SECURITY.md) |
-| [`perf-gpu-engineer`](../.claude/agents/perf-gpu-engineer.md) | The compute gate & benchmark fidelity | Any scene over 5% of the 8.33 ms/120 Hz budget, un-gated per-pixel fbm, octave creep, regressions vs `bench/baseline.json`, the Metal-vs-OpenGL proxy caveat, the Apple-Silicon "cheaper hash doesn't help" trap |
-| [`accessibility-legibility`](../.claude/agents/accessibility-legibility.md) | The core promise: text stays legible | Intact `iChannel0` alpha-composite passthrough in every scene, glyph contrast over the effect, `IS_DAY` night dimming, motion/flash intensity (reduced-motion analog), colorblind safety, light-background terminals |
+| [`perf-gpu-engineer`](../.claude/agents/perf-gpu-engineer.md) | The compute gate & benchmark fidelity | Any scene over its collection's budget (`budget_pct`; poems: 75%) of the 8.33 ms/120 Hz frame, un-gated per-pixel fbm, octave creep, regressions vs `bench/baseline.json`, the Metal-vs-OpenGL proxy caveat, the Apple-Silicon "cheaper hash doesn't help" trap |
+| [`accessibility-legibility`](../.claude/agents/accessibility-legibility.md) | The core promise: text stays legible | Intact `iChannel0` alpha-composite passthrough in every scene, glyph contrast over the effect, motion/glow/tint intensity within a calm legible ceiling (reduced-motion analog), colorblind safety, light-background terminals |
 | [`visual-regression-qa`](../.claude/agents/visual-regression-qa.md) | `bench/golden.sh` | A golden reference for every scene, meaningful diff tolerance, every scene change updating or passing golden, deterministic inputs (fixed `iTime`, transparent `iChannel0`), the cross-hardware fp-determinism caveat |
 
 ## How to run them with Claude Code
@@ -40,8 +40,8 @@ designed to complement, not duplicate, each other — see
 **One reviewer, one area.** When a change touches a single concern, invoke that
 persona directly — through the Task tool, or in plain language:
 
-> use the perf-gpu-engineer subagent to review the cloudy.glsl change
->> use the accessibility-legibility subagent on shaders/weather/snow.glsl
+> use the perf-gpu-engineer subagent to review the jiang-xue.glsl change
+>> use the accessibility-legibility subagent on shaders/poems/jiang-xue.glsl
 
 The subagent reads only what its charter names, runs the relevant commands
 (`bench/run-bench.sh`, `shellcheck`, `glslangValidator`, `bench/golden.sh check`),
@@ -73,7 +73,8 @@ spend their attention on the judgment calls CI cannot make.
 **Mechanized in CI** (`.github/workflows/ci.yml`):
 
 - **Compute gate** — `bench/run-bench.sh` fails the macOS job if any scene
-  exceeds 5% of the frame budget. (`perf-gpu-engineer`'s hard floor.)
+  exceeds its collection's budget (`budget_pct`; poems: 75%) of the frame.
+  (`perf-gpu-engineer`'s hard floor.)
 - **Golden-image diff** — `bench/golden.sh check` fails on visual drift beyond
   tolerance. (`visual-regression-qa`'s hard floor.)
 - **Shellcheck** — every shell script: `bin/`, `install.sh`, `bench/*.sh`,
@@ -82,8 +83,9 @@ spend their attention on the judgment calls CI cannot make.
 - **GLSL parse** — `glslangValidator` on each scene wrapped by
   `bench/wrap-shader.sh` under **both** host profiles (`gl410` desktop GL
   and `es300` WebGL2) — the gate that pins scenes to the portable subset.
-- **Unit tests** — `tests/run-tests.sh` over the decision logic (WMO
-  mapping, moon phase, env parsing) on Linux.
+- **Unit tests** — `tests/run-tests.sh` over the matcher's pure functions
+  (provider classifiers, the rule-engine scorer, the weighted pick, env
+  parsing) on Linux.
 - **Markdown lint** — `markdownlint-cli2` across all docs.
 
 **Needs human/agent adjudication** (what the panel is *for*):

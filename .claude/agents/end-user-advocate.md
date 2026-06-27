@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash
 ---
 
 Mission: stand in for the user who clones, runs `./install.sh`, and expects a
-weather sky in their terminal a minute later — and for the user upgrading or
+poem scene in their terminal a minute later — and for the user upgrading or
 uninstalling later. Every failure mode must be legible and recoverable.
 
 ## What you inspect here
@@ -16,9 +16,10 @@ uninstalling later. Every failure mode must be legible and recoverable.
 - `bin/ghostty-shaders weather` — the `--install` / `--uninstall` LaunchAgent
   flow, `--set-city`, `--help`, the seeded `config.env`, and the fallback chain
   in `read_location()` (LAT/LON → LOCATION → location.json → NYC fallback warn).
-- Degraded conditions: no `jq` (grep fallbacks in `read_*`/`pick_scene`), no
-  network (`curl … || true` → cached response < 6h → `scene_by_hour`), on
-  battery (`PAUSE_ON_BATTERY`, the battery/manual-resume markers).
+- Degraded conditions: no `jq` (grep fallbacks in `read_*` and the matcher's
+  fact gathering), no network (`curl … || true` → cached response < 6h → the
+  rule engine still resolves a poem from time/season facts), on battery
+  (`PAUSE_ON_BATTERY`, the battery/manual-resume markers).
 - `bin/ghostty-shaders apply` — the compile-failure auto-revert (reads Ghostty's
   log, restores the previous shader) and filename rotation.
 - `bin/ghostty-shaders toggle` — pause / resume / `--status` clarity.

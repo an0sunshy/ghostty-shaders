@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# 40-festival — festival proximity provider. Emits {"festival":..,
+# "days_to_festival":N} for the nearest UPCOMING festival in data/festivals.json
+# (today counts as 0). Nothing emitted if none is upcoming in the table.
+# Lunar→Gregorian dates are precomputed (see data/festivals.json). No network.
+#
+# Test seams: GHOSTTY_SHADERS_TODAY (YYYY-MM-DD) overrides "today";
+# GHOSTTY_SHADERS_FESTIVALS overrides the data file path.
+set -euo pipefail
+
+# Pure: epoch (seconds) for a YYYY-MM-DD at local noon (noon anchor keeps the
+# day-count DST-robust). Portable across BSD (macOS) and GNU date.
+_epoch() {
+    local d="$1"
+    date -j -f "%Y-%m-%d %H:%M:%S" "$d 12:00:00" +%s 2>/dev/null \
+        || date -d "$d 12:00:00" +%s 2>/dev/null
+}
+
+# Pure: whole days from today→fest (negative if fest already passed). Both
+# anchored at noon, so the diff rounds cleanly to a day count.
+days_until() {
+    local today="$1" fest="$2" t f diff
+    t=$(_epoch "$today"); f=$(_epoch "$fest")
+    [[ -n $t && -n $f ]] || return 1
+    diff=$(( f - t ))
+    if (( diff >= 0 )); then echo $(( (diff + 43200) / 86400 ))
+    else echo $(( -(( -diff + 43200) / 86400) )); fi
+}
+
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then return 0; fi
+
+DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+REPO_DIR="$(cd "$DIR/../../.." && pwd)"
+FEST_FILE="${GHOSTTY_SHADERS_FESTIVALS:-$REPO_DIR/data/festivals.json}"
+TODAY="${GHOSTTY_SHADERS_TODAY:-$(date +%Y-%m-%d)}"
+
+command -v jq >/dev/null 2>&1 || exit 0     # no jq ⇒ no festival facts
+[[ -f $FEST_FILE ]] || exit 0
+
+best_name=""; best_days=1000000
+while IFS=' ' read -r name fdate; do
+    [[ -n $name && -n $fdate ]] || continue
+    d=$(days_until "$TODAY" "$fdate" 2>/dev/null) || continue
+    if (( d >= 0 && d < best_days )); then best_days=$d; best_name=$name; fi
+done < <(jq -r '.festivals | to_entries[] | .value | to_entries[] | "\(.key) \(.value)"' "$FEST_FILE")
+
+[[ -n $best_name ]] || exit 0
+printf '{"festival":"%s","days_to_festival":%d}\n' "$best_name" "$best_days"
